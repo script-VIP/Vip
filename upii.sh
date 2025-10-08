@@ -19,7 +19,7 @@ NC='\033[0m'
 # =============================================
 MYIP=$(curl -sS ipv4.icanhazip.com)
 author=$(cat /etc/xray/username 2>/dev/null || echo "AIMAN-VPN")
-Exp2=$(curl -sS https://raw.githubusercontent.com/AngIMAN/izin/main/ip | grep $MYIP | awk '{print $3}')
+Exp2=$(curl -sS https://raw.githubusercontent.com/script-VIP/vip/main/ip | grep $MYIP | awk '{print $3}')
 # =============================================
 # BANDWIDTH CALCULATION - ORIGINAL CODE
 # =============================================
@@ -117,7 +117,7 @@ clear
 # // DAYS LEFT
 d1=$(date -d "$valid" +%s)
 d2=$(date -d "$today" +%s)
-#certifacate=$(((d1 - d2) / 86400))
+certifacate=$(((d1 - d2) / 86400))
 clear
 # =============================================
 # SERVICE STATUS
@@ -176,8 +176,8 @@ count_accounts() {
 
 print_header() {
     clear
-    echo -e "${ORANGE}════════════════════════════════════════════════${NC}"
-    echo -e "${BG_RED}${WHITE}                 👑 $author                  ${NC}"
+    echo -e "${ORANGE}═══════════════════════════════════════════════════${NC}"
+    echo -e "${BG_RED}${WHITE}                 👑 $author                   ${NC}"
     echo -e "${ORANGE}════════════════════════════════════════════════${NC}"
 }
 
@@ -188,22 +188,22 @@ print_system_info() {
     local domain=$(cat /etc/xray/domain 2>/dev/null || echo "sg3.myyy.my.id")
     local username=$(cat /usr/bin/user 2>/dev/null || echo "Sg3")
     
-    echo -e "${CYAN}╭─ SYSTEM INFORMATION ────────────────────────────╮${NC}"
+    echo -e "${CYAN}╭─ SYSTEM INFORMATION ──────────────────────────────╮${NC}"
     echo -e "${CYAN}│ ${YELLOW}📛 User    ${NC}: ${WHITE}$username${NC}"
     echo -e "${CYAN}│ ${YELLOW}🖥️ OS      ${NC}: ${WHITE}$os_info${NC}"
-    echo -e "${CYAN}│ ${YELLOW}💾 RAM     ${NC}: ${WHITE}${ram}MB${NC}"
+    echo -e "${CYAN}│ ${YELLOW}💾 RAM     ${NC}: ${WHITE}${ram} MB${NC}"
     echo -e "${CYAN}│ ${YELLOW}🌐 IP VPS  ${NC}: ${WHITE}$MYIP${NC}"
     echo -e "${CYAN}│ ${YELLOW}🏢 ISP     ${NC}: ${WHITE}$isp${NC}"
     echo -e "${CYAN}│ ${YELLOW}🔗 Domain  ${NC}: ${WHITE}$domain${NC}"
     echo -e "${CYAN}│ ${YELLOW}⏰ Active  ${NC}: ${GREEN}$(((d1 - d2) / 86400)) Days $Exp2 ${NC}"
-    echo -e "${CYAN}╰──────────────────────────────────────────────╯${NC}"
+    echo -e "${CYAN}╰───────────────────────────────────────────────╯${NC}"
 }
 
 print_service_status() {
-    echo -e "${PURPLE}╭─ SERVICE STATUS ─────────────────────────────╮${NC}"
+    echo -e "${PURPLE}╭─ SERVICE STATU──────────────────────────────╮─╮${NC}"
     echo -e "${PURPLE}│ ${CYAN}🔄 HAPROXY ${NC}: $(get_service_status haproxy)  ${PURPLE}│ ${CYAN}🌐 NGINX ${NC}: $(get_service_status nginx)  ${PURPLE}│ ${CYAN}⚡ SSHWS ${NC}: $(get_service_status ws) ${PURPLE}│${NC}"
-    echo -e "${PURPLE}│ ${CYAN}🚀 XRAY    ${NC}: $(get_service_status xray)  ${PURPLE}│ ${CYAN}🔐 SSH   ${NC}: $(get_service_status ssh)  ${PURPLE}│ ${CYAN}🐻 DROPB  ${NC}: $(get_service_status dropbear) ${PURPLE}│${NC}"
-    echo -e "${PURPLE}╰─────────────────────────────────────────────╯${NC}"
+    echo -e "${PURPLE}│ ${CYAN}🚀 XRAY    ${NC}: $(get_service_status xray)  ${PURPLE}│ ${CYAN}🔐 SSH   ${NC}: $(get_service_status ssh)  ${PURPLE}│ ${CYAN}🐻 DROPB ${NC}: $(get_service_status dropbear) ${PURPLE}│${NC}"
+    echo -e "${PURPLE}╰────────────────────────────────────────────╯─╯${NC}"
 }
 
 print_bandwidth() {
@@ -233,10 +233,10 @@ print_accounts() {
 }
 
 print_menu() {
-    echo -e "${RED}╭─ MAIN MENU ─────────────────────────────────────╮${NC}"
-    echo -e "${RED}│ ${WHITE}[7] Menu System       ${RED}│ ${WHITE}[10] Menu Backup   ${RED}│${NC}"
-    echo -e "${RED}│ ${WHITE}[8] Bot Telegram      ${RED}│ ${WHITE}[11] Info VPS      ${RED}│${NC}"
-    echo -e "${RED}│ ${WHITE}[9] Restart Server    ${RED}│ ${WHITE}[12] Menu Admin    ${RED}│${NC}"
+    echo -e "${RED}╭─ MAIN MENU ────────────────────────────────────╮${NC}"
+    echo -e "${RED}│ ${WHITE}[7] Menu System        ${RED}│  ${WHITE}[10] Menu Backup    ${RED}│${NC}"
+    echo -e "${RED}│ ${WHITE}[8] Bot Telegram       ${RED}│  ${WHITE}[11] Info VPS       ${RED}│${NC}"
+    echo -e "${RED}│ ${WHITE}[9] Restart Server     ${RED}│  ${WHITE}[12] Menu Admin     ${RED}│${NC}"
     echo -e "${RED}╰────────────────────────────────────────────────╯${NC}"
 }
 
