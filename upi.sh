@@ -14,27 +14,38 @@ echo -e "  ${y}─────────────────────�
 echo -e "    ${ungu}   TIME      USERNAME      LIMIT IP    LOGIN IP ${NC}"
 echo -e "  ${y}────────────────────────────────────────────────────${NC}"
 
-# Data contoh - PASTI RAPI
-data_contoh=(
-    "08:15:23:user1:2:1"
-    "09:30:45:user2:2:-"
-    "10:45:12:user3:4:2"
-    "11:20:33:user4:1:-"
-    "12:35:47:user5:1:1"
-    "13:22:18:user6:2:-"
-    "14:45:29:user7:3:1"
-    "15:18:52:user8:1:-"
-)
-
 total_login=0
-online_sekarang=0
 
-for data in "${data_contoh[@]}"; do
-    time=$(echo $data | cut -d: -f1)
-    user=$(echo $data | cut -d: -f2)
-    limit=$(echo $data | cut -d: -f3)
-    login=$(echo $data | cut -d: -f4)
-    
+# Ambil riwayat login 24 jam dari auth.log
+if [[ -f "/var/log/auth.log" ]]; then
+    grep "Accepted" /var/log/auth.log | \
+    grep "$(date -d '24 hours ago' '+%b %e')" | \
+    while read line; do
+        
+        waktu=$(echo "$line" | awk '{print $3}')
+        user=$(echo "$line" | awk '{print $9}')
+        ip=$(echo "$line" | awk '{print $11}')
+        
+        if [[ -n "$user" && -n "$ip" ]]; then
+            limit=$(cat /etc/kyt/limit/ssh/ip/$user 2>/dev/null || echo "2")
+            
+            if cek-ssh 2>/dev/null | grep -q "$user"; then
+                status="${g}1 IP${NC}"
+            else
+                status="${RED}-${NC}"
+            fi
+            
+            echo -e "    $(printf '%-9s %-12s %-10s %-15s' "$waktu" "$user" "$limit" "$status")"
+            ((total_login++))
+        fi
+    done
+fi
+
+online_sekarang=$(cek-ssh 2>/dev/null | grep -c -v "USER" 2>/dev/null || echo "0")
+
+echo -e "  ${y}────────────────────────────────────────────────────${NC}"
+echo -e "    ${cyan}TOTAL LOGIN 24J: $total_login ${NC} | ${g}ONLINE SEKARANG: $online_sekarang${NC}"
+echo -e "  ${y}────────────────────────────────────────────────────${NC}"    
     if [[ "$login" == "-" ]]; then
         status="${RED}-${NC}"
     else
