@@ -1,195 +1,83 @@
 #!/bin/bash
 
 # Color Definitions
-BLUE_CYAN='\e[5;36m'
-WHITE_BE='\e[5;37m'
-GREEN_BE='\e[5;32m'
-PURPLE='\033[35m'
-YELLOW='\e[33m'
-WHITE="\033[97;1m"
-GREEN="\033[92;1m"
-CYAN="\033[96;1m"
-RED="\033[91;1m"
-BG_BLUE="\033[44;1m"
-BG_GREEN="\033[42;1m"
-BG_RED="\033[41;1m"
-BG_PURPLE="\033[45;1m"
-BG_CYAN="\033[46;1m"
-BG_YELLOW="\033[43;1m"
-NC='\e[0m'
-
-# Line Definitions
-LONG_LINE="${BLUE_CYAN}———————————————————————————————————————————${NC}"
-SHORT_LINE="${CYAN}——————————————${NC}"
-DOUBLE_LINE="${BLUE_CYAN}═══════════════════════════════════════════════${NC}"
-SIDE_LINE="${BLUE_CYAN}│${NC}"
+BLUE_CYAN='\033[1;96m'
+WHITE_BE='\033[1;97m'
+GREEN_BE='\033[1;92m'
+PURPLE='\033[1;95m'
+YELLOW='\033[1;93m'
+WHITE="\033[1;97m"
+GREEN="\033[1;92m"
+CYAN="\033[1;96m"
+RED="\033[1;91m"
+ORANGE='\033[1;33m'
+NC='\033[0m'
 
 clear
 
 function print_success() {
     if [[ 0 -eq $? ]]; then
-        echo -e "${LONG_LINE}"
         echo -e "${GREEN}✓ $1 berhasil dipasang${NC}"
-        echo -e "${LONG_LINE}"
         sleep 2
     fi
 }
 
 function print_error() {
-    echo -e "${LONG_LINE}"
     echo -e "${RED}✗ $1${NC}"
-    echo -e "${LONG_LINE}"
     sleep 2
-}
-
-# Header Functions
-function header_main() {
-    echo -e "${SIDE_LINE} ${BG_BLUE}            MENU UTAMA SCRIPT            ${NC} ${SIDE_LINE}"
-}
-
-function header_system() {
-    echo -e "${SIDE_LINE} ${BG_BLUE}              MENU SYSTEM               ${NC} ${SIDE_LINE}"
-}
-
-function header_fix() {
-    echo -e "${SIDE_LINE} ${BG_GREEN}               MENU FIX                 ${NC} ${SIDE_LINE}"
-}
-
-function header_admin() {
-    echo -e "${SIDE_LINE} ${BG_RED}            ONLY FOR ADMIN              ${NC} ${SIDE_LINE}"
-}
-
-function header_clear() {
-    echo -e "${SIDE_LINE} ${BG_PURPLE}             MENU CLEANUP              ${NC} ${SIDE_LINE}"
-}
-
-function header_info() {
-    echo -e "${SIDE_LINE} ${BG_CYAN}              INFORMATION               ${NC} ${SIDE_LINE}"
-}
-
-function header_other() {
-    echo -e "${SIDE_LINE} ${BG_YELLOW}                OTHER                  ${NC} ${SIDE_LINE}"
-}
-
-# Rename Function
-function Rename() {
-    clear
-    echo -e "${DOUBLE_LINE}"
-    echo -e "${SIDE_LINE} ${CYAN}         Welcome To Script Vpn Express         ${NC} ${SIDE_LINE}"
-    echo -e "${DOUBLE_LINE}"
-    echo ""
-    sleep 2
-    
-    echo -e "${SHORT_LINE}"
-    echo -e "${SIDE_LINE} ${GREEN}          Please Select an Option           ${NC} ${SIDE_LINE}"
-    echo -e "${SHORT_LINE}"
-    echo -e "${SIDE_LINE}   ${GREEN}1)${NC} Rename Script                      ${SIDE_LINE}"
-    echo -e "${SIDE_LINE}   ${GREEN}2)${NC} Default Name                       ${SIDE_LINE}"
-    echo -e "${SHORT_LINE}"
-    
-    read -p "  ${SIDE_LINE} Please select option 1-2 or Any Button (Default): " host
-    echo ""
-    
-    if [[ $host == "1" ]]; then
-        clear
-        echo -e "${DOUBLE_LINE}"
-        echo -e "${SIDE_LINE} ${GREEN}           CHANGE SCRIPT NAME            ${NC} ${SIDE_LINE}"
-        echo -e "${DOUBLE_LINE}"
-        echo ""
-        read -p "  ${SIDE_LINE} INPUT YOUR NAME : " host1
-        read -p "  ${SIDE_LINE} INPUT ADMIN PASS : " host11
-        
-        rm /etc/xray/username
-        if [[ $host11 == "123Admin" ]]; then
-            echo $host1 >> /etc/xray/username
-            echo ""
-            clear
-            print_success "Rename Script"
-            sleep 3
-            menu
-        else
-            echo "VPN EXPRESS" > /etc/xray/username
-            clear
-            print_error "Permission Denied - Invalid Admin Password"
-            sleep 3
-            show_owner_info
-        fi
-    elif [[ $host == "2" ]]; then
-        rm /etc/xray/username
-        echo "VPN EXPRESS" > /etc/xray/username
-        clear
-        print_success "Script Name Set to Default"
-        sleep 3
-        menu
-    fi
-}
-
-function show_owner_info() {
-    clear
-    echo -e "${DOUBLE_LINE}"
-    echo -e "${SIDE_LINE} ${BG_RED}        404 NOT FOUND AUTOSCRIPT          ${NC} ${SIDE_LINE}"
-    echo -e "${DOUBLE_LINE}"
-    echo -e "${SIDE_LINE}                                                 ${SIDE_LINE}"
-    echo -e "${SIDE_LINE}        ${RED}PERMISSION DENIED !${NC}                   ${SIDE_LINE}"
-    echo -e "${SIDE_LINE}  ${YELLOW}Buy access permissions for scripts${NC}       ${SIDE_LINE}"
-    echo -e "${SIDE_LINE}        ${YELLOW}Contact Admin :${NC}                    ${SIDE_LINE}"
-    echo -e "${SIDE_LINE}   ${GREEN}WhatsApp${NC} wa.me/628981874211              ${SIDE_LINE}"
-    echo -e "${SIDE_LINE}   ${GREEN}Telegram${NC} t.me/AimanVpnExpress            ${SIDE_LINE}"
-    echo -e "${DOUBLE_LINE}"
-    sleep 3
-    print_success "Script Name Default"
-    sleep 2
-    menu
 }
 
 # Banner Function
 function Banner(){
     clear
-    echo -e "${DOUBLE_LINE}"
-    header_main
-    echo -e "${DOUBLE_LINE}"
+    echo -e "${BLUE_CYAN}─────────────────────────────────────────────${NC}"
+    echo -e "${CYAN}           SCRIPT VPN EXPRESS${NC}"
+    echo -e "${BLUE_CYAN}─────────────────────────────────────────────${NC}"
+    echo ""
 }
 
-# Main Menu Display dengan layout 2 kolom
+# Main Menu Display 
 function Menu_Lambofgod() {
-    # Kategori SYSTEM (1-10)
-    echo -e "${SHORT_LINE}"
-    header_system
-    echo -e "${SHORT_LINE}"
-    echo -e "${SIDE_LINE}   ${GREEN}1)${NC} Running Service        ${GREEN}6)${NC} Spesifikasi VPS       ${SIDE_LINE}"
-    echo -e "${SIDE_LINE}   ${GREEN}2)${NC} Change Domain          ${GREEN}7)${NC} Auto Reboot           ${SIDE_LINE}"
-    echo -e "${SIDE_LINE}   ${GREEN}3)${NC} Change Banner          ${GREEN}8)${NC} SpeedTest             ${SIDE_LINE}"
-    echo -e "${SIDE_LINE}   ${GREEN}4)${NC} Update Script          ${GREEN}9)${NC} Monitoring            ${SIDE_LINE}"
-    echo -e "${SIDE_LINE}   ${GREEN}5)${NC} Check Bandwidth        ${GREEN}10)${NC} Restart Service      ${SIDE_LINE}"
+    # Header dengan garis seperti contoh
+    echo -e "${BLUE_CYAN}─────────────────────────────────────────────╯${NC}"
+    echo -e "          ${CYAN}╭─ SYSTEM MENU ───────────────────────────────╮${NC}"
+    echo -e "          ${GREEN}│ [1] Running Service${NC}    ${GREEN}│  [6] Spesifikasi VPS${NC}      ${GREEN}│${NC}"
+    echo -e "          ${GREEN}│ [2] Change Domain${NC}      ${GREEN}│  [7] Auto Reboot${NC}          ${GREEN}│${NC}"
+    echo -e "          ${GREEN}│ [3] Change Banner${NC}      ${GREEN}│  [8] SpeedTest${NC}            ${GREEN}│${NC}"
+    echo -e "          ${GREEN}│ [4] Update Script${NC}      ${GREEN}│  [9] Monitoring${NC}           ${GREEN}│${NC}"
+    echo -e "          ${GREEN}│ [5] Check Bandwidth${NC}    ${GREEN}│  [10] Restart Service${NC}     ${GREEN}│${NC}"
+    echo -e "          ${CYAN}╰────────────────────────────────────────────────╯${NC}"
+    echo ""
     
-    # Kategori FIX (11-20)
-    echo -e "${SHORT_LINE}"
-    header_fix
-    echo -e "${SHORT_LINE}"
-    echo -e "${SIDE_LINE}   ${GREEN}11)${NC} Fix Domain            ${GREEN}16)${NC} Fix Epro             ${SIDE_LINE}"
-    echo -e "${SIDE_LINE}   ${GREEN}12)${NC} Fix Haproxy           ${GREEN}17)${NC} Fix Udp              ${SIDE_LINE}"
-    echo -e "${SIDE_LINE}   ${GREEN}13)${NC} Fix Xray              ${GREEN}18)${NC} Clear Logs           ${SIDE_LINE}"
-    echo -e "${SIDE_LINE}   ${GREEN}14)${NC} Fix Bot Tele          ${GREEN}19)${NC} Clear Cache          ${SIDE_LINE}"
-    echo -e "${SIDE_LINE}   ${GREEN}15)${NC} Fix nginx             ${GREEN}20)${NC} Clear Cache File     ${SIDE_LINE}"
+    # Fix Menu
+    echo -e "          ${CYAN}╭─ FIX MENU ───────────────────────────────────╮${NC}"
+    echo -e "          ${PURPLE}│ [11] Fix Domain${NC}       ${PURPLE}│  [16] Fix Epro${NC}            ${PURPLE}│${NC}"
+    echo -e "          ${PURPLE}│ [12] Fix Haproxy${NC}      ${PURPLE}│  [17] Fix Udp${NC}             ${PURPLE}│${NC}"
+    echo -e "          ${PURPLE}│ [13] Fix Xray${NC}         ${PURPLE}│  [18] Clear Logs${NC}          ${PURPLE}│${NC}"
+    echo -e "          ${PURPLE}│ [14] Fix Bot Tele${NC}     ${PURPLE}│  [19] Clear Cache${NC}         ${PURPLE}│${NC}"
+    echo -e "          ${PURPLE}│ [15] Fix nginx${NC}        ${PURPLE}│  [20] Clear Cache File${NC}    ${PURPLE}│${NC}"
+    echo -e "          ${CYAN}╰────────────────────────────────────────────────╯${NC}"
+    echo ""
     
-    # Kategori ADMIN & TOOLS (21-30)
-    echo -e "${SHORT_LINE}"
-    header_admin
-    echo -e "${SHORT_LINE}"
-    echo -e "${SIDE_LINE}   ${GREEN}21)${NC} Force Reboot          ${GREEN}26)${NC} Change Name          ${SIDE_LINE}"
-    echo -e "${SIDE_LINE}   ${GREEN}22)${NC} Limit Speed           ${GREEN}27)${NC} Wildcard             ${SIDE_LINE}"
-    echo -e "${SIDE_LINE}   ${GREEN}23)${NC} Enable Anti Ddos      ${GREEN}28)${NC} Menu Rebuild         ${SIDE_LINE}"
-    echo -e "${SIDE_LINE}   ${GREEN}24)${NC} Info Port Payload     ${GREEN}29)${NC} Bot WhatsApp         ${SIDE_LINE}"
-    echo -e "${SIDE_LINE}   ${GREEN}25)${NC} Developer Script      ${GREEN}30)${NC} Menu Admin Only      ${SIDE_LINE}"
+    # Admin & Tools Menu
+    echo -e "          ${CYAN}╭─ ADMIN & TOOLS ──────────────────────────────╮${NC}"
+    echo -e "          ${ORANGE}│ [21] Force Reboot${NC}     ${ORANGE}│  [26] Change Name${NC}         ${ORANGE}│${NC}"
+    echo -e "          ${ORANGE}│ [22] Limit Speed${NC}      ${ORANGE}│  [27] Wildcard${NC}            ${ORANGE}│${NC}"
+    echo -e "          ${ORANGE}│ [23] Enable Anti Ddos${NC} ${ORANGE}│  [28] Menu Rebuild${NC}        ${ORANGE}│${NC}"
+    echo -e "          ${ORANGE}│ [24] Info Port Payload${NC}${ORANGE}│  [29] Bot WhatsApp${NC}        ${ORANGE}│${NC}"
+    echo -e "          ${ORANGE}│ [25] Developer Script${NC} ${ORANGE}│  [30] Menu Admin Only${NC}     ${ORANGE}│${NC}"
+    echo -e "          ${CYAN}╰────────────────────────────────────────────────╯${NC}"
+    echo ""
     
-    echo -e "${LONG_LINE}"
-    echo -e "${SIDE_LINE}   ${RED}0)${NC} Back to Main Menu                                  ${SIDE_LINE}"
-    echo -e "${LONG_LINE}"
+    # Exit Option
+    echo -e "${BLUE_CYAN}─────────────────────────────────────────────${NC}"
+    echo -e "          ${RED}[0] Back to Main Menu${NC}"
+    echo -e "${BLUE_CYAN}─────────────────────────────────────────────${NC}"
     echo -e ""
 }
 
 function Select_Menu() {
-    read -p "  ${SIDE_LINE} Select From Options [0-30]: " NB
+    read -p " Select menu option : " NB
     case $NB in
         # SYSTEM (1-10)
         1) clear ; run ;;
@@ -230,6 +118,62 @@ function Select_Menu() {
         0) clear ; menu ;;
         *) clear ; menu ;;
     esac
+}
+
+# Rename Function dengan tampilan baru
+function Rename() {
+    clear
+    Banner
+    echo -e "${BLUE_CYAN}─────────────────────────────────────────────╯${NC}"
+    echo -e "          ${CYAN}╭─ CHANGE SCRIPT NAME ────────────────────────╮${NC}"
+    echo -e "          ${YELLOW}│ [1] Rename Script${NC}                            ${YELLOW}│${NC}"
+    echo -e "          ${YELLOW}│ [2] Default Name${NC}                             ${YELLOW}│${NC}"
+    echo -e "          ${CYAN}╰────────────────────────────────────────────────╯${NC}"
+    echo ""
+    
+    read -p " Select option : " host
+    
+    if [[ $host == "1" ]]; then
+        echo -e "          ${CYAN}╭─ INPUT DETAILS ─────────────────────────────────╮${NC}"
+        read -p " │ Input Your Name : " host1
+        read -p " │ Input Admin Pass : " host11
+        echo -e "          ${CYAN}╰────────────────────────────────────────────────╯${NC}"
+        
+        rm /etc/xray/username
+        if [[ $host11 == "123Admin" ]]; then
+            echo $host1 >> /etc/xray/username
+            print_success "Script Renamed Successfully"
+        else
+            echo "VPN EXPRESS" > /etc/xray/username
+            print_error "Invalid Admin Password - Using Default Name"
+        fi
+    elif [[ $host == "2" ]]; then
+        rm /etc/xray/username
+        echo "VPN EXPRESS" > /etc/xray/username
+        print_success "Script Name Set to Default"
+    fi
+    sleep 3
+    menu
+}
+
+function show_owner_info() {
+    clear
+    echo -e "${BLUE_CYAN}─────────────────────────────────────────────${NC}"
+    echo -e "${RED}          404 NOT FOUND AUTOSCRIPT${NC}"
+    echo -e "${BLUE_CYAN}─────────────────────────────────────────────${NC}"
+    echo -e "          ${CYAN}╭─ PERMISSION DENIED ─────────────────────────╮${NC}"
+    echo -e "          ${YELLOW}│${NC}                                            ${YELLOW}│${NC}"
+    echo -e "          ${YELLOW}│${NC}        ${RED}PERMISSION DENIED !${NC}                   ${YELLOW}│${NC}"
+    echo -e "          ${YELLOW}│${NC}  ${ORANGE}Buy access permissions for scripts${NC}       ${YELLOW}│${NC}"
+    echo -e "          ${YELLOW}│${NC}        ${ORANGE}Contact Admin :${NC}                    ${YELLOW}│${NC}"
+    echo -e "          ${YELLOW}│${NC}   ${GREEN}WhatsApp${NC} wa.me/628981874211              ${YELLOW}│${NC}"
+    echo -e "          ${YELLOW}│${NC}   ${GREEN}Telegram${NC} t.me/AimanVpnExpress            ${YELLOW}│${NC}"
+    echo -e "          ${YELLOW}│${NC}                                            ${YELLOW}│${NC}"
+    echo -e "          ${CYAN}╰────────────────────────────────────────────────╯${NC}"
+    sleep 3
+    print_success "Script Name Default"
+    sleep 2
+    menu
 }
 
 # Main Execution
