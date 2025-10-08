@@ -110,8 +110,7 @@ count_accounts() {
 print_header() {
     clear
     echo -e "${BLUE}════════════════════════════════════════════════════${NC}"
-    echo -e "${BG_BLUE}${WHITE}                  🚀 J u i c e S S H                  ${NC}"
-    echo -e "${BG_BLUE}${WHITE}                  👑 A u t h o r : $author                  ${NC}"
+    echo -e "${BG_BLUE}${WHITE}                   $author                  ${NC}"
     echo -e "${BLUE}════════════════════════════════════════════════════${NC}"
     echo ""
 }
