@@ -216,7 +216,7 @@ count_accounts() {
 print_header() {
     clear
     echo -e "${ORANGE} ═════════════════════════════════════════════════${NC}"
-    echo -e "${BG_RED}${WHITE}               👑 $author                ${NC}"
+    echo -e "${BG_RED} ${WHITE}                👑 $author                ${NC}"
     echo -e "${ORANGE} ═════════════════════════════════════════════════${NC}"
 }
 
@@ -234,15 +234,15 @@ print_system_info() {
     echo -e "${CYAN}│ ${YELLOW}🌐 IP VPS  ${NC}: ${WHITE}$MYIP${NC}"
     echo -e "${CYAN}│ ${YELLOW}🏢 ISP     ${NC}: ${WHITE}$isp${NC}"
     echo -e "${CYAN}│ ${YELLOW}🔗 Domain  ${NC}: ${WHITE}$domain${NC}"
-    echo -e "${CYAN}│ ${YELLOW}⏰ Active  ${NC}:$days_display, $Exp2  ${NC}"
-    echo -e "${CYAN}╰───────────────────────────────────────────────╯${NC}"
+    echo -e "${CYAN}│ ${YELLOW}⏰ Active  ${NC}: $days_display, $Exp2  ${NC}"
+    echo -e "${CYAN}╰────────────────────────────────────────────────╯${NC}"
 }
 
 print_service_status() {
-    echo -e "${PURPLE}╭─ SERVICE STATUS ──────────────────────────────╮${NC}"
+    echo -e "${PURPLE}╭─ SERVICE STATUS ───────────────────────────────╮${NC}"
     echo -e "${PURPLE}│ ${CYAN}🔄 HAPROXY ${NC}: $(get_service_status haproxy)  ${PURPLE}│ ${CYAN}🌐 NGINX ${NC}: $(get_service_status nginx)  ${PURPLE}│ ${CYAN}⚡ SSHWS ${NC}: $(get_service_status ws) ${PURPLE}${NC}"
     echo -e "${PURPLE}│ ${CYAN}🚀 XRAY    ${NC}: $(get_service_status xray)  ${PURPLE}│ ${CYAN}🔐 SSH   ${NC}: $(get_service_status ssh)  ${PURPLE}│ ${CYAN}🐻 DROPB ${NC}: $(get_service_status dropbear) ${PURPLE}${NC}"
-    echo -e "${PURPLE}╰───────────────────────────────────────────────╯"  
+    echo -e "${PURPLE}╰────────────────────────────────────────────────╯"  
 }
 print_bandwidth() {
     echo -e "${GREEN}╭─ BANDWIDTH USAGE ──────────────────────────────╮${NC}"
@@ -289,7 +289,7 @@ print_bandwidth
 print_accounts
 print_menu
 
-read -p "${GREEN}👉 Select menu option :  " hallo
+read -p "👉 Select menu option :  " hallo
 
 
 case $hallo in
