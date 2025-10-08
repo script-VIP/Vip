@@ -251,7 +251,7 @@ print_accounts
 print_menu
 
 echo -e "${GREEN}👉 Select menu option :  ${NC}  \c"
-read -p "" hallo
+read -p " hallo
 
 case $hallo in
 1) m-ssh ;; # menu ssh
