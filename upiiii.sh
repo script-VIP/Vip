@@ -114,11 +114,50 @@ oid=$(cat /usr/bin/ver)
 #exp=$(cat /usr/bin/e)
 ######################################
 clear
-# // DAYS LEFT
-d1=$(date -d "$valid" +%s)
-d2=$(date -d "$today" +%s)
-certifacate=$(((d1 - d2) / 86400))
-clear
+# =============================================
+# LICENSE & EXPIRY DATE
+# =============================================
+# Cek file yang berisi tanggal expired
+if [ -f "/usr/bin/e" ]; then
+    exp_date=$(cat /usr/bin/e)
+    # Format tanggal: YYYY-MM-DD atau DD-MM-YYYY
+    if [[ $exp_date =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+        valid="$exp_date"
+    elif [[ $exp_date =~ ^[0-9]{2}-[0-9]{2}-[0-9]{4}$ ]]; then
+        valid=$(date -d "$exp_date" +%Y-%m-%d 2>/dev/null || echo "$exp_date")
+    else
+        valid="$exp_date"
+    fi
+else
+    valid="2024-12-31"  # Default fallback
+fi
+
+# Tanggal hari ini
+today=$(date +%Y-%m-%d)
+
+# // DAYS LEFT CALCULATION
+if [[ $valid =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+    d1=$(date -d "$valid" +%s 2>/dev/null)
+    d2=$(date -d "$today" +%s)
+    
+    if [ -n "$d1" ] && [ -n "$d2" ]; then
+        days_left=$(((d1 - d2) / 86400))
+        
+        if [ $days_left -lt 0 ]; then
+            days_display="${RED}EXPIRED${NC}"
+        elif [ $days_left -eq 0 ]; then
+            days_display="${RED}LAST DAY${NC}"
+        elif [ $days_left -le 7 ]; then
+            days_display="${YELLOW}$days_left Days${NC}"
+        else
+            days_display="${GREEN}$days_left Days${NC}"
+        fi
+    else
+        days_display="${RED}INVALID DATE${NC}"
+    fi
+else
+    days_display="${RED}INVALID FORMAT${NC}"
+fi
 # =============================================
 # SERVICE STATUS
 # =============================================
@@ -176,9 +215,9 @@ count_accounts() {
 
 print_header() {
     clear
-    echo -e "${ORANGE}═════════════════════════════════════════════════${NC}"
+    echo -e "${ORANGE} ═════════════════════════════════════════════════${NC}"
     echo -e "${BG_RED}${WHITE}               👑 $author                ${NC}"
-    echo -e "${ORANGE}═════════════════════════════════════════════════${NC}"
+    echo -e "${ORANGE} ═════════════════════════════════════════════════${NC}"
 }
 
 print_system_info() {
@@ -195,7 +234,7 @@ print_system_info() {
     echo -e "${CYAN}│ ${YELLOW}🌐 IP VPS  ${NC}: ${WHITE}$MYIP${NC}"
     echo -e "${CYAN}│ ${YELLOW}🏢 ISP     ${NC}: ${WHITE}$isp${NC}"
     echo -e "${CYAN}│ ${YELLOW}🔗 Domain  ${NC}: ${WHITE}$domain${NC}"
-    echo -e "${CYAN}│ ${YELLOW}⏰ Active  ${NC}: ${GREEN} $(((d1 - d2) / 86400)) Days\e[97m, $Exp2   ${NC}"
+    echo -e "${CYAN}│ ${YELLOW}⏰ Active  ${NC}:$days_display, $Exp2  ${NC}"
     echo -e "${CYAN}╰───────────────────────────────────────────────╯${NC}"
 }
 
@@ -203,13 +242,13 @@ print_service_status() {
     echo -e "${PURPLE}╭─ SERVICE STATUS ──────────────────────────────╮${NC}"
     echo -e "${PURPLE}│ ${CYAN}🔄 HAPROXY ${NC}: $(get_service_status haproxy)  ${PURPLE}│ ${CYAN}🌐 NGINX ${NC}: $(get_service_status nginx)  ${PURPLE}│ ${CYAN}⚡ SSHWS ${NC}: $(get_service_status ws) ${PURPLE}${NC}"
     echo -e "${PURPLE}│ ${CYAN}🚀 XRAY    ${NC}: $(get_service_status xray)  ${PURPLE}│ ${CYAN}🔐 SSH   ${NC}: $(get_service_status ssh)  ${PURPLE}│ ${CYAN}🐻 DROPB ${NC}: $(get_service_status dropbear) ${PURPLE}${NC}"
-    echo -e "${PURPLE}╰──────────────────────────────────────────────╯"  
+    echo -e "${PURPLE}╰───────────────────────────────────────────────╯"  
 }
 print_bandwidth() {
     echo -e "${GREEN}╭─ BANDWIDTH USAGE ──────────────────────────────╮${NC}"
     echo -e "${GREEN}│ ${YELLOW}📊 TODAY ${NC}    : ${WHITE}$today_total $today_txv${NC}"
     echo -e "${GREEN}│ ${YELLOW}📈 MONTHLY ${NC}  : ${WHITE}$month_total $month_txv${NC}"
-    echo -e "${GREEN}╰─────────────────────────────────────────────────╯${NC}"
+    echo -e "${GREEN}╰────────────────────────────────────────────────╯${NC}"
 }
 
 print_accounts() {
