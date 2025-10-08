@@ -203,7 +203,7 @@ print_service_status() {
     echo -e "${PURPLE}╭─ SERVICE STATUS ───────────────────────────────╮{NC}"
     echo -e "${PURPLE}│ ${CYAN}🔄 HAPROXY ${NC}: $(get_service_status haproxy)  ${PURPLE}│ ${CYAN}🌐 NGINX ${NC}: $(get_service_status nginx)  ${PURPLE}│ ${CYAN}⚡ SSHWS ${NC}: $(get_service_status ws) ${PURPLE}${NC}"
     echo -e "${PURPLE}│ ${CYAN}🚀 XRAY    ${NC}: $(get_service_status xray)  ${PURPLE}│ ${CYAN}🔐 SSH   ${NC}: $(get_service_status ssh)  ${PURPLE}│ ${CYAN}🐻 DROPB ${NC}: $(get_service_status dropbear) ${PURPLE}${NC}"
-    echo -e "${PURPLE}╰──────────────────────────────────────────────╯  
+    echo -e "${PURPLE}╰──────────────────────────────────────────────╯"  
 }
 print_bandwidth() {
     echo -e "${GREEN}╭─ BANDWIDTH USAGE ──────────────────────────────╮${NC}"
