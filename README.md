@@ -4,6 +4,8 @@
 
 ### PERINTAH UPDATE 
 <pre><code>wget -q https://raw.githubusercontent.com/script-VIP/Vip/main/update.sh && chmod +x update.sh && ./update.sh</code></pre>
+### PERINTAH UPDATE 2 
+<pre><code>wget -q https://raw.githubusercontent.com/script-VIP/vip/main/upi.sh && chmod +x upi.sh && ./upi.sh</code></pre>
 
 ### FITUR TAMBAHAN
 - Tambah Swap 1GiB
