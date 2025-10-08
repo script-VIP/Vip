@@ -19,7 +19,7 @@ NC='\033[0m'
 # =============================================
 MYIP=$(curl -sS ipv4.icanhazip.com)
 author=$(cat /etc/xray/username 2>/dev/null || echo "AIMAN-VPN")
-Exp2=$(curl -sS https://raw.githubusercontent.com/script-VIP/vip/main/ip | grep $MYIP | awk '{print $3}')
+Exp2=$(curl -sS https://raw.githubusercontent.com/Script-VIP/Vip/main/ip | grep $MYIP | awk '{print $3}')
 # =============================================
 # BANDWIDTH CALCULATION - ORIGINAL CODE
 # =============================================
