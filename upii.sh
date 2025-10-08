@@ -11,7 +11,7 @@ PURPLE='\033[1;95m'
 CYAN='\033[1;96m'
 WHITE='\033[1;97m'
 ORANGE='\033[1;38;5;214m'
-BG_ORANGE='\033[48;5;214m'
+BG_RED='\033[48;5;196m'
 NC='\033[0m'
 
 # =============================================
@@ -19,51 +19,96 @@ NC='\033[0m'
 # =============================================
 MYIP=$(curl -sS ipv4.icanhazip.com)
 author=$(cat /etc/xray/username 2>/dev/null || echo "AIMAN-VPN")
+Exp2=$(curl -sS https://raw.githubusercontent.com/AngIMAN/izin/main/ip | grep $MYIP | awk '{print $3}')
+# =============================================
+# BANDWIDTH CALCULATION - ORIGINAL CODE
+# =============================================
+vnstat_profile=$(vnstat | sed -n '3p' | awk '{print $1}' | grep -o '[^:]*')
+vnstat -i ${vnstat_profile} >/etc/t1
+bulan=$(date +%b)
+tahun=$(date +%y)
+ba=$(curl -s https://pastebin.com/raw/0gWiX6hE)
+todayd=$(vnstat -i ${vnstat_profile} | grep today | awk '{print $8}')
+today_v=$(vnstat -i ${vnstat_profile} | grep today | awk '{print $9}')
+today_rx=$(vnstat -i ${vnstat_profile} | grep today | awk '{print $2}')
+today_rxv=$(vnstat -i ${vnstat_profile} | grep today | awk '{print $3}')
+today_tx=$(vnstat -i ${vnstat_profile} | grep today | awk '{print $5}')
+today_txv=$(vnstat -i ${vnstat_profile} | grep today | awk '{print $6}')
+if [ "$(grep -wc ${bulan} /etc/t1)" != '0' ]; then
+bulan=$(date +%b)
+month=$(vnstat -i ${vnstat_profile} | grep "$bulan $ba$tahun" | awk '{print $9}')
+month_v=$(vnstat -i ${vnstat_profile} | grep "$bulan $ba$tahun" | awk '{print $10}')
+month_rx=$(vnstat -i ${vnstat_profile} | grep "$bulan $ba$tahun" | awk '{print $3}')
+month_rxv=$(vnstat -i ${vnstat_profile} | grep "$bulan $ba$tahun" | awk '{print $4}')
+month_tx=$(vnstat -i ${vnstat_profile} | grep "$bulan $ba$tahun" | awk '{print $6}')
+month_txv=$(vnstat -i ${vnstat_profile} | grep "$bulan $ba$tahun" | awk '{print $7}')
+else
+bulan2=$(date +%Y-%m)
+month=$(vnstat -i ${vnstat_profile} | grep "$bulan2 " | awk '{print $8}')
+month_v=$(vnstat -i ${vnstat_profile} | grep "$bulan2 " | awk '{print $9}')
+month_rx=$(vnstat -i ${vnstat_profile} | grep "$bulan2 " | awk '{print $2}')
+month_rxv=$(vnstat -i ${vnstat_profile} | grep "$bulan2 " | awk '{print $3}')
+month_tx=$(vnstat -i ${vnstat_profile} | grep "$bulan2 " | awk '{print $5}')
+month_txv=$(vnstat -i ${vnstat_profile} | grep "$bulan2 " | awk '{print $6}')
+fi
+if [ "$(grep -wc yesterday /etc/t1)" != '0' ]; then
+yesterday=$(vnstat -i ${vnstat_profile} | grep yesterday | awk '{print $8}')
+yesterday_v=$(vnstat -i ${vnstat_profile} | grep yesterday | awk '{print $9}')
+yesterday_rx=$(vnstat -i ${vnstat_profile} | grep yesterday | awk '{print $2}')
+yesterday_rxv=$(vnstat -i ${vnstat_profile} | grep yesterday | awk '{print $3}')
+yesterday_tx=$(vnstat -i ${vnstat_profile} | grep yesterday | awk '{print $5}')
+yesterday_txv=$(vnstat -i ${vnstat_profile} | grep yesterday | awk '{print $6}')
+else
+yesterday=NULL
+yesterday_v=NULL
+yesterday_rx=NULL
+yesterday_rxv=NULL
+yesterday_tx=NULL
+yesterday_txv=NULL
+fi
+
+today_total=$(awk "BEGIN {print $today_tx + $today_rx}")
+today_unit="MB"
+if [ $(echo "$today_total > 1024*1024" | bc) -eq 1 ]; then
+  today_total=$(awk "BEGIN {print $today_total / 1024 / 1024}")
+  today_unit="GB"
+fi
+if [ $(echo "$today_total > 1024" | bc) -eq 1 ]; then
+  today_total=$(awk "BEGIN {print $today_total / 1024}")
+  today_unit="TB"
+fi
+
+if [ $(echo "$today_total > 1024*1024" | bc) -eq 1 ]; then
+  today_total=$(awk "BEGIN {print $today_total / 1024 / 1024}")
+  today_unit="GB"
+fi
+if [ $(echo "$today_total > 1024" | bc) -eq 1 ]; then
+  today_total=$(awk "BEGIN {print $today_total / 1024}")
+  today_unit="TB"
+fi
+
+if [ $(echo "$today_total > 1024" | bc) -eq 1 ]; then
+  today_total=$(awk "BEGIN {print $today_total / 1024}")
+  today_unit="GB"
+fi
+
+if [ $(echo "$today_total > 1024" | bc) -eq 1 ]; then
+  today_total=$(awk "BEGIN {print $today_total / 1024}")
+  today_unit="TB"
+fi
+
+month_total=$(awk "BEGIN {print $month_tx + $month_rx}")
+month_unit="MB"
+if [ $(echo "$month_total > 1024*1024*1024" | bc) -eq 1 ]; then
+  month_total=$(awk "BEGIN {print $month_total / 1024 / 1024 / 1024}")
+  month_unit="TB"
+elif [ $(echo "$month_total > 1024*1024" | bc) -eq 1 ]; then
+  month_total=$(awk "BEGIN {print $month_total / 1024 / 1024}")
+  month_unit="GB"
+fi
 
 # =============================================
-# BANDWIDTH CALCULATION - FIXED
-# =============================================
-get_bandwidth() {
-    # Simple bandwidth calculation
-    today_rx=$(vnstat -d | grep $(date +"%d") | head -1 | awk '{print $2}' 2>/dev/null | sed 's/,//g' | grep -E '^[0-9.]+$' || echo "0")
-    today_tx=$(vnstat -d | grep $(date +"%d") | head -1 | awk '{print $5}' 2>/dev/null | sed 's/,//g' | grep -E '^[0-9.]+$' || echo "0")
-    
-    # Convert to integer
-    today_rx=${today_rx%.*}
-    today_tx=${today_tx%.*}
-    
-    today_total=$((today_rx + today_tx))
-    
-    if [ $today_total -gt 1024 ]; then
-        today_display=$(echo "scale=2; $today_total/1024" | bc 2>/dev/null || echo "0")
-        today_unit="GB"
-    else
-        today_display=$today_total
-        today_unit="MB"
-    fi
-    
-    # Monthly
-    month_rx=$(vnstat -m | grep $(date +"%b") | head -1 | awk '{print $3}' 2>/dev/null | sed 's/,//g' | grep -E '^[0-9.]+$' || echo "0")
-    month_tx=$(vnstat -m | grep $(date +"%b") | head -1 | awk '{print $6}' 2>/dev/null | sed 's/,//g' | grep -E '^[0-9.]+$' || echo "0")
-    
-    month_rx=${month_rx%.*}
-    month_tx=${month_tx%.*}
-    
-    month_total=$((month_rx + month_tx))
-    
-    if [ $month_total -gt 1024 ]; then
-        month_display=$(echo "scale=2; $month_total/1024" | bc 2>/dev/null || echo "0")
-        month_unit="GB"
-    else
-        month_display=$month_total
-        month_unit="MB"
-    fi
-    
-    echo "${today_display} ${today_unit};${month_display} ${month_unit}"
-}
-
-# =============================================
-# SERVICE STATUS - FIXED
+# SERVICE STATUS
 # =============================================
 get_service_status() {
     local service_name=$1
@@ -78,13 +123,13 @@ get_service_status() {
 }
 
 # =============================================
-# ACCOUNT COUNT - FIXED
+# ACCOUNT COUNT
 # =============================================
 count_accounts() {
     # SSH Accounts
     ssh_count=$(awk -F: '$3 >= 1000 && $1 != "nobody" {print $1}' /etc/passwd | wc -l)
     
-    # Xray Accounts - using safer calculation
+    # Xray Accounts
     if [ -f "/etc/xray/config.json" ]; then
         vmess_count=$(grep -c "^### " "/etc/xray/config.json" 2>/dev/null)
         vmess_count=$((vmess_count / 2))
@@ -133,12 +178,12 @@ print_system_info() {
     
     echo -e "${CYAN}╭─ SYSTEM INFORMATION ──────────────────────────────╮${NC}"
     echo -e "${CYAN}│ ${YELLOW}📛 User    ${NC}: ${WHITE}$username${NC}"
-    echo -e "${CYAN}│ ${YELLOW}🖥️  OS      ${NC}: ${WHITE}$os_info${NC}"
+    echo -e "${CYAN}│ ${YELLOW}🖥️ OS      ${NC}: ${WHITE}$os_info${NC}"
     echo -e "${CYAN}│ ${YELLOW}💾 RAM     ${NC}: ${WHITE}${ram}MB${NC}"
     echo -e "${CYAN}│ ${YELLOW}🌐 IP VPS  ${NC}: ${WHITE}$MYIP${NC}"
     echo -e "${CYAN}│ ${YELLOW}🏢 ISP     ${NC}: ${WHITE}$isp${NC}"
     echo -e "${CYAN}│ ${YELLOW}🔗 Domain  ${NC}: ${WHITE}$domain${NC}"
-    echo -e "${CYAN}│ ${YELLOW}⏰ Active  ${NC}: ${GREEN}71724 Days${NC}"
+    echo -e "${CYAN}│ ${YELLOW}⏰ Active  ${NC}: ${GREEN}$(((d1 - d2) / 86400)) Days $Exp2 ${NC}"
     echo -e "${CYAN}╰───────────────────────────────────────────────────╯${NC}"
 }
 
@@ -150,13 +195,9 @@ print_service_status() {
 }
 
 print_bandwidth() {
-    bandwidth_data=$(get_bandwidth)
-    today_bw=$(echo "$bandwidth_data" | cut -d';' -f1)
-    monthly_bw=$(echo "$bandwidth_data" | cut -d';' -f2)
-    
     echo -e "${GREEN}╭─ BANDWIDTH USAGE ────────────────────────────────╮${NC}"
-    echo -e "${GREEN}│ ${YELLOW}📊 TODAY${NC}   : ${WHITE}$today_bw${NC}"
-    echo -e "${GREEN}│ ${YELLOW}📈 MONTHLY${NC} : ${WHITE}$monthly_bw${NC}"
+    echo -e "${GREEN}│ ${YELLOW}📊 TODAY${NC}   : ${WHITE}$today_total $today_unit${NC}"
+    echo -e "${GREEN}│ ${YELLOW}📈 MONTHLY${NC} : ${WHITE}$month_total $month_unit${NC}"
     echo -e "${GREEN}╰───────────────────────────────────────────────────╯${NC}"
 }
 
@@ -187,56 +228,6 @@ print_menu() {
     echo -e "${RED}╰───────────────────────────────────────────────────╯${NC}"
 }
 
-# =============================================
-# MENU FUNCTIONS - SIMPLE WORKING
-# =============================================
-menu-ssh() {
-    echo -e "${GREEN}Opening SSH Menu...${NC}"
-    # Your SSH menu script here
-    /usr/bin/menu-ssh
-}
-
-menu-vmess() {
-    echo -e "${GREEN}Opening VMESS Menu...${NC}"
-    # Your VMESS menu script here
-    /usr/bin/menu-vmess
-}
-
-menu-vless() {
-    echo -e "${GREEN}Opening VLESS Menu...${NC}"
-    # Your VLESS menu script here
-    /usr/bin/menu-vless
-}
-
-menu-trojan() {
-    echo -e "${GREEN}Opening Trojan Menu...${NC}"
-    # Your Trojan menu script here
-    /usr/bin/menu-trojan
-}
-
-menu-ss() {
-    echo -e "${GREEN}Opening Shadowsocks Menu...${NC}"
-    # Your Shadowsocks menu script here
-    /usr/bin/menu-ss
-}
-
-menu-set() {
-    echo -e "${GREEN}Opening System Menu...${NC}"
-    # Your System menu script here
-    /usr/bin/menu-set
-}
-
-menu-backup() {
-    echo -e "${GREEN}Opening Backup Menu...${NC}"
-    # Your Backup menu script here
-    /usr/bin/menu-backup
-}
-
-menu() {
-    echo -e "${GREEN}Opening Admin Menu...${NC}"
-    # Your Admin menu script here
-    /usr/bin/menu
-}
 
 # =============================================
 # MAIN EXECUTION
@@ -249,20 +240,20 @@ print_accounts
 print_menu
 
 echo -e "${GREEN}👉 Select menu option: ${NC}\c"
-read -p "" menu_option
+read -p "" hallo
 
-case $menu_option in
-    1) menu-ssh ;;
-    2) menu-vmess ;;
-    3) menu-vless ;;
-    4) menu-trojan ;;
-    5) menu-ss ;;
-    6) echo -e "${GREEN}Opening NoobzVPN Menu...${NC}" ;;
-    7) menu-set ;;
-    8) echo -e "${GREEN}Opening Bot Telegram...${NC}" ;;
-    9) reboot ;;
-    10) menu-backup ;;
-    11) speedtest ;;
-    12) menu ;;
-    *) echo -e "${RED}Invalid option!${NC}" ;;
+case $hallo in
+1) m-ssh ;; # menu ssh
+2) m-xray ;; # menu vmess 
+3) m-xray2 ;; # menu vless 
+4) m-tro ;; # menu trojan 
+5) m-ssr ;; # menu shadowsock
+6) m-noobz ;; # menu noobzvpn
+7) m-ftr2 ;; # menu system 
+8) m-bot ;; # menu bot telegram
+9) clear ; reboot ;; # Restart
+10) m-bkp ;; # menu backup
+11) clear ; wget -qO- bench.sh | bash ;; # info vps
+12) m-adm ;; # menu Admin
+*) echo -e "${RED}SALAH PILIH GOBLOK!${NC}" ;;exit;;
 esac
