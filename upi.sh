@@ -11,6 +11,7 @@ GREEN="\033[1;92m"
 CYAN="\033[1;96m"
 RED="\033[1;91m"
 ORANGE='\033[1;33m'
+BG_RED="\033[41;1m"
 NC='\033[0m'
 
 clear
@@ -30,6 +31,7 @@ function print_error() {
 # Banner Function
 function Banner(){
     clear
+    echo -e "${BG_RED}                     ALL FEATURE MENU                     ${NC}"
     echo -e "${BLUE_CYAN}─────────────────────────────────────────────${NC}"
     echo -e "${CYAN}           SCRIPT VPN EXPRESS${NC}"
     echo -e "${BLUE_CYAN}─────────────────────────────────────────────${NC}"
@@ -41,16 +43,16 @@ function Menu_Lambofgod() {
     # Header dengan garis seperti contoh
     echo -e "${BLUE_CYAN}─────────────────────────────────────────────╯${NC}"
     echo -e "${CYAN}╭─ SYSTEM MENU ───────────────────────────────────╮${NC}"
-    echo -e "${GREEN}│ [1] Running Service${NC}     ${GREEN}│  [11] Auto Reboot${NC}          ${GREEN}│${NC}"
-    echo -e "${GREEN}│ [2] Change Domain${NC}       ${GREEN}│  [12] SpeedTest${NC}            ${GREEN}│${NC}"
-    echo -e "${GREEN}│ [3] Change Banner${NC}       ${GREEN}│  [13] Monitoring${NC}           ${GREEN}│${NC}"
-    echo -e "${GREEN}│ [4] Update Script${NC}       ${GREEN}│  [14] Restart Service${NC}      ${GREEN}│${NC}"
-    echo -e "${GREEN}│ [5] Check Bandwidth${NC}     ${GREEN}│  [15] Spesifikasi VPS${NC}      ${GREEN}│${NC}"
-    echo -e "${GREEN}│ [6] Menu Panel${NC}          ${GREEN}│  [16] Cek VPS Online${NC}       ${GREEN}│${NC}"
-    echo -e "${GREEN}│ [7] Auto Backup${NC}         ${GREEN}│  [17] Update Neofetch${NC}      ${GREEN}│${NC}"
-    echo -e "${GREEN}│ [8] Cek Bandwidth${NC}       ${GREEN}│  [18] Menu Bot${NC}             ${GREEN}│${NC}"
-    echo -e "${GREEN}│ [9] Bot Telegram${NC}        ${GREEN}│  [19] Info VPS${NC}             ${GREEN}│${NC}"
-    echo -e "${GREEN}│ [10] Restart Server${NC}     ${GREEN}│  [20] Menu Backup${NC}          ${GREEN}│${NC}"
+    echo -e "${GREEN}│ [1] Change Domain${NC}       ${GREEN}│  [11] Menu Panel${NC}           ${GREEN}│${NC}"
+    echo -e "${GREEN}│ [2] Change Banner${NC}       ${GREEN}│  [12] Menu Bot${NC}             ${GREEN}│${NC}"
+    echo -e "${GREEN}│ [3] Change Name${NC}         ${GREEN}│  [13] Menu Backup${NC}          ${GREEN}│${NC}"
+    echo -e "${GREEN}│ [4] Running Service${NC}     ${GREEN}│  [14] Bot Telegram${NC}         ${GREEN}│${NC}"
+    echo -e "${GREEN}│ [5] Restart Service${NC}     ${GREEN}│  [15] Bot WhatsApp${NC}         ${GREEN}│${NC}"
+    echo -e "${GREEN}│ [6] Restart Server${NC}      ${GREEN}│  [16] Auto Backup${NC}          ${GREEN}│${NC}"
+    echo -e "${GREEN}│ [7] Auto Reboot${NC}         ${GREEN}│  [17] Update Script${NC}        ${GREEN}│${NC}"
+    echo -e "${GREEN}│ [8] SpeedTest${NC}           ${GREEN}│  [18] Check Bandwidth${NC}      ${GREEN}│${NC}"
+    echo -e "${GREEN}│ [9] Monitoring${NC}          ${GREEN}│  [19] Dor Xl${NC}               ${GREEN}│${NC}"
+    echo -e "${GREEN}│ [10] Spesifikasi VPS${NC}    ${GREEN}│  [20] Info VPS${NC}             ${GREEN}│${NC}"
     echo -e "${CYAN}╰────────────────────────────────────────────────╯${NC}"
     echo ""
     
@@ -64,13 +66,13 @@ function Menu_Lambofgod() {
     echo -e "${CYAN}╰────────────────────────────────────────────────╯${NC}"
     echo ""
     
-    # Admin & Tools Menu
-    echo -e "${CYAN}╭─ ADMIN & TOOLS ────────────────────────────────╮${NC}"
-    echo -e "${ORANGE}│ [31] Force Reboot${NC}      ${ORANGE}│  [36] Change Name${NC}          ${ORANGE}│${NC}"
-    echo -e "${ORANGE}│ [32] Limit Speed${NC}       ${ORANGE}│  [37] Wildcard${NC}             ${ORANGE}│${NC}"
-    echo -e "${ORANGE}│ [33] Enable Anti Ddos${NC}  ${ORANGE}│  [38] Menu Rebuild${NC}         ${ORANGE}│${NC}"
-    echo -e "${ORANGE}│ [34] Info Port Payload${NC} ${ORANGE}│  [39] Bot WhatsApp${NC}         ${ORANGE}│${NC}"
-    echo -e "${ORANGE}│ [35] Developer Script${NC}  ${ORANGE}│  [40] Menu Admin Only${NC}      ${ORANGE}│${NC}"
+    # Tools More Menu
+    echo -e "${CYAN}╭─ TOOLS MORE ───────────────────────────────────╮${NC}"
+    echo -e "${ORANGE}│ [31] Force Reboot${NC}      ${ORANGE}│  [36] Wildcard${NC}             ${ORANGE}│${NC}"
+    echo -e "${ORANGE}│ [32] Limit Speed${NC}       ${ORANGE}│  [37] Menu Rebuild${NC}         ${ORANGE}│${NC}"
+    echo -e "${ORANGE}│ [33] Enable Anti Ddos${NC}  ${ORANGE}│  [38] Menu Admin Only${NC}      ${ORANGE}│${NC}"
+    echo -e "${ORANGE}│ [34] Info Port Payload${NC} ${ORANGE}│  [39] Cek VPS Online${NC}       ${ORANGE}│${NC}"
+    echo -e "${ORANGE}│ [35] Developer Script${NC}  ${ORANGE}│  [40] Update Neofetch${NC}      ${ORANGE}│${NC}"
     echo -e "${CYAN}╰────────────────────────────────────────────────╯${NC}"
     echo ""
     
@@ -84,27 +86,27 @@ function Menu_Lambofgod() {
 function Select_Menu() {
     read -p " Select menu option : " NB
     case $NB in
-        # SYSTEM (1-20)
-        1) clear ; run ;;
-        2) clear ; change-domain ;;
-        3) clear ; nano /etc/banner.txt ;;
-        4) clear ; wget -q https://raw.githubusercontent.com/AngIMAN/express/main/update.sh && chmod +x update.sh && ./update.sh ;;
-        5) clear ; bw ;;
-        6) clear ; m-panel ;;
-        7) clear ; auto_backup ;;
-        8) clear ; bw ;;
-        9) clear ; bot_telegram ;;
-        10) clear ; restart_server ;;
-        11) clear ; autoreboot ;;
-        12) clear ; speedtest ;;
-        13) clear ; monitoring ;;
-        14) clear ; restart_service ;;
-        15) clear ; wget -qO- bench.sh | bash ;;
-        16) clear ; cek_vps_online ;;
-        17) clear ; neo ;;
-        18) clear ; menu-bot ;;
-        19) clear ; info_vps ;;
-        20) clear ; menu_backup ;;
+        # SYSTEM (1-20) - Sudah ditukar
+        1) clear ; change-domain ;;
+        2) clear ; nano /etc/banner.txt ;;
+        3) clear ; Rename ;;
+        4) clear ; run ;;
+        5) clear ; restart_service ;;
+        6) clear ; restart_server ;;
+        7) clear ; autoreboot ;;
+        8) clear ; speedtest ;;
+        9) clear ; monitoring ;;
+        10) clear ; wget -qO- bench.sh | bash ;;
+        11) clear ; m-panel ;;
+        12) clear ; menu-bot ;;
+        13) clear ; menu_backup ;;
+        14) clear ; bot_telegram ;;
+        15) clear ; botwa ;;
+        16) clear ; auto_backup ;;
+        17) clear ; wget -q https://raw.githubusercontent.com/AngIMAN/express/main/update.sh && chmod +x update.sh && ./update.sh ;;
+        18) clear ; bw ;;
+        19) clear ; dorxl ;;
+        20) clear ; info_vps ;;
         
         # FIX (21-30)
         21) clear ; fixcert ;;
@@ -118,17 +120,17 @@ function Select_Menu() {
         29) clear ; clearcache ;;
         30) clear ; clearlog ;;
         
-        # ADMIN & TOOLS (31-40)
+        # TOOLS MORE (31-40)
         31) clear ; reboot ;;
         32) clear ; limitspeed ;;
         33) clear ; anti-ddos ;;
         34) clear ; Info_Port ;;
         35) clear ; about ;;
-        36) clear ; Rename ;;
-        37) clear ; wild ;;
-        38) clear ; m-rebuild ;;
-        39) clear ; botwa ;;
-        40) clear ; m-adm ;;
+        36) clear ; wild ;;
+        37) clear ; m-rebuild ;;
+        38) clear ; m-adm ;;
+        39) clear ; cek_vps_online ;;
+        40) clear ; neo ;;
         
         0) clear ; menu ;;
         *) clear ; menu ;;
