@@ -74,7 +74,7 @@ show_menu() {
     echo
     echo -e "1. ${GREEN}📥 INSTALL DOR${END}       $STATUS_ICON $STATUS_TEXT"
     echo -e "2. ${YELLOW}🔄 UPDATE DOR${END}"
-    echo -e "3. ${BLUE}🚀 MENU DOR${END} (cd me-cli && python main.py)"
+    echo -e "3. ${BLUE}🚀 JALANKAN DOR${END} (cd me-cli && python3 main.py)"
     echo -e "4. ${MAGENTA}⚙️  SETUP ENVIRONMENT${END}"
     echo -e "5. ${WHITE}ℹ️  INFO & BANTUAN${END}"
     echo -e "0. ${RED}❌ KELUAR${END}"
@@ -93,7 +93,7 @@ install_dor() {
         rm -rf "$INSTALL_DIR"
     fi
     
-    # Step-by-step installation with error handling
+    # Step-by-step installation
     print_info "1. Update system..."
     sudo apt update && sudo apt upgrade -y
     if [ $? -eq 0 ]; then
@@ -120,6 +120,12 @@ install_dor() {
         return 1
     fi
     
+    # Create python alias if not exists
+    if ! command -v python &> /dev/null; then
+        sudo ln -s /usr/bin/python3 /usr/bin/python
+        print_success "Created python alias"
+    fi
+    
     print_info "4. Clone repository..."
     git clone "$REPO_URL"
     if [ $? -eq 0 ]; then
@@ -129,27 +135,41 @@ install_dor() {
         return 1
     fi
     
-    print_info "5. Install requirements..."
+    print_info "5. Install Python packages..."
     cd "$INSTALL_DIR"
     
-    # Install basic requirements first
+    # Upgrade pip first
+    pip3 install --upgrade pip
+    
+    # Install basic packages without specific versions
     pip3 install requests colorama pillow python-dotenv
     
-    # Try to install from requirements.txt if exists
+    # Try to install from requirements.txt but ignore version errors
     if [ -f "requirements.txt" ]; then
-        pip3 install -r requirements.txt
+        print_info "Mencoba install requirements.txt..."
+        # Remove specific versions from requirements.txt
+        grep -v '==' requirements.txt > requirements_simple.txt
+        pip3 install -r requirements_simple.txt
+        rm -f requirements_simple.txt
     fi
     
     cd ..
     
-    print_success "Requirements installed"
+    print_success "Python packages installed"
     
     # Verify installation
     if [ -f "$INSTALL_DIR/main.py" ]; then
         print_success "🎉 DOR BERHASIL DIINSTALL!"
         echo -e "${GREEN}Lokasi: $(pwd)/$INSTALL_DIR${END}"
+        
+        # Test Python
+        echo
+        print_info "Testing Python..."
+        if python3 --version; then
+            print_success "Python3 bekerja"
+        fi
     else
-        print_error "Installasi ada masalah, tapi coba lanjut..."
+        print_error "File main.py tidak ditemukan!"
     fi
     
     echo
@@ -174,8 +194,16 @@ update_dor() {
     print_info "Update dari GitHub..."
     git pull --rebase
     
-    print_info "Update requirements..."
-    pip3 install -r requirements.txt --upgrade
+    print_info "Update Python packages..."
+    pip3 install --upgrade pip
+    pip3 install requests colorama pillow python-dotenv --upgrade
+    
+    # Try to update requirements.txt if exists
+    if [ -f "requirements.txt" ]; then
+        grep -v '==' requirements.txt > requirements_simple.txt
+        pip3 install -r requirements_simple.txt --upgrade
+        rm -f requirements_simple.txt
+    fi
     
     cd ..
     
@@ -184,7 +212,7 @@ update_dor() {
     read
 }
 
-menu_dor() {
+run_dor() {
     clear_screen
     if [ ! -d "$INSTALL_DIR" ]; then
         print_error "Install DOR dulu!"
@@ -193,53 +221,17 @@ menu_dor() {
         return
     fi
     
-    echo -e "${CYAN}🚀 MENU DOR - python main.py${END}"
+    echo -e "${CYAN}🚀 MENJALANKAN DOR...${END}"
+    echo -e "${YELLOW}Tekan Ctrl+C untuk berhenti${END}"
+    echo -e "${CYAN}========================================${END}"
     echo
-    echo -e "${GREEN}Pilih opsi:${END}"
-    echo -e "1. ${YELLOW}Jalankan normal${END} (python main.py)"
-    echo -e "2. ${YELLOW}Jalankan dengan auto-restart${END}"
-    echo -e "3. ${YELLOW}Jalankan dengan custom command${END}"
-    echo -e "0. ${RED}Kembali${END}"
-    echo
-    echo -n -e "${YELLOW}Pilih opsi (0-3): ${END}"
-    read -r choice
     
-    case $choice in
-        1)
-            echo -e "${CYAN}Menjalankan: cd me-cli && python3 main.py${END}"
-            echo -e "${YELLOW}Tekan Ctrl+C untuk berhenti${END}"
-            echo -e "${CYAN}========================================${END}"
-            cd "$INSTALL_DIR"
-            python3 main.py
-            cd ..
-            ;;
-        2)
-            echo -e "${CYAN}Mode auto-restart...${END}"
-            cd "$INSTALL_DIR"
-            while true; do
-                python3 main.py
-                echo -e "${YELLOW}Restart dalam 3 detik...${END}"
-                sleep 3
-            done
-            cd ..
-            ;;
-        3)
-            echo -n -e "${YELLOW}Masukkan command: ${END}"
-            read -r cmd
-            echo -e "${CYAN}Menjalankan: cd me-cli && $cmd${END}"
-            cd "$INSTALL_DIR"
-            eval "$cmd"
-            cd ..
-            ;;
-        0)
-            return
-            ;;
-        *)
-            print_error "Pilihan tidak valid!"
-            ;;
-    esac
+    cd "$INSTALL_DIR"
+    python3 main.py
+    cd ..
     
     echo
+    echo -e "${CYAN}========================================${END}"
     echo -e "${YELLOW}Tekan Enter untuk kembali...${END}"
     read
 }
@@ -263,9 +255,18 @@ setup_environment() {
     echo -e "${YELLOW}Command:${END}"
     echo -e "${WHITE}nano me-cli/.env${END}"
     echo
+    echo -e "${YELLOW}Cara pakai nano:${END}"
+    echo -e "${WHITE}- Paste text dari rentry.co${END}"
+    echo -e "${WHITE}- Tekan Ctrl+X${END}"
+    echo -e "${WHITE}- Tekan Y untuk simpan${END}"
+    echo -e "${WHITE}- Tekan Enter untuk konfirmasi${END}"
+    echo
+    
     echo -e "${YELLOW}Tekan Enter untuk buka browser...${END}"
     read
-    xdg-open "https://rentry.co/me-cli" 2>/dev/null
+    xdg-open "https://rentry.co/me-cli" 2>/dev/null || \
+    echo -e "${RED}Tidak bisa buka browser otomatis${END}"
+    echo -e "${YELLOW}Buka manual: https://rentry.co/me-cli${END}"
     
     echo
     echo -e "${YELLOW}Setelah selesai, tekan Enter...${END}"
@@ -281,12 +282,32 @@ show_info() {
     echo -e "${GREEN}📊 STATUS:${END}"
     if [ "$installed" = "1" ]; then
         echo -e "DOR: ${GREEN}✅ Terinstall${END}"
+        
+        # Check Python
+        if command -v python3 &> /dev/null; then
+            echo -e "Python3: ${GREEN}✅ Terinstall${END}"
+        else
+            echo -e "Python3: ${RED}❌ Tidak terinstall${END}"
+        fi
+        
+        # Check main.py
+        if [ -f "$INSTALL_DIR/main.py" ]; then
+            echo -e "main.py: ${GREEN}✅ Ditemukan${END}"
+        else
+            echo -e "main.py: ${RED}❌ Tidak ditemukan${END}"
+        fi
     else
         echo -e "DOR: ${RED}❌ Belum Install${END}"
     fi
     echo
     
-    echo -e "${GREEN}📚 INSTALL MANUAL:${END}"
+    echo -e "${GREEN}🐛 MASALAH UMUM:${END}"
+    echo -e "${WHITE}• Python: gunakan python3 bukan python${END}"
+    echo -e "${WHITE}• Requirements: skip jika ada error version${END}"
+    echo -e "${WHITE}• Environment: buat file .env di folder me-cli${END}"
+    echo
+    
+    echo -e "${GREEN}📚 COMMAND MANUAL:${END}"
     echo -e "${WHITE}git clone https://github.com/purplemashu/me-cli${END}"
     echo -e "${WHITE}cd me-cli${END}"
     echo -e "${WHITE}pip3 install requests colorama pillow python-dotenv${END}"
@@ -312,7 +333,7 @@ main() {
         case $choice in
             1) install_dor ;;
             2) update_dor ;;
-            3) menu_dor ;;
+            3) run_dor ;;
             4) setup_environment ;;
             5) show_info ;;
             0) 
