@@ -1,388 +1,297 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+#!/bin/bash
 
-import os
-import sys
-import subprocess
-import time
-from pathlib import Path
+# Colors
+RED='\033[91m'
+GREEN='\033[92m'
+YELLOW='\033[93m'
+BLUE='\033[94m'
+MAGENTA='\033[95m'
+CYAN='\033[96m'
+WHITE='\033[97m'
+BOLD='\033[1m'
+UNDERLINE='\033[4m'
+END='\033[0m'
 
-class Colors:
-    RED = '\033[91m'
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    BLUE = '\033[94m'
-    MAGENTA = '\033[95m'
-    CYAN = '\033[96m'
-    WHITE = '\033[97m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
-    END = '\033[0m'
+# Config
+SCRIPT_NAME="main.py"
+REPO_URL="https://github.com/purplemashu/me-cli"
+INSTALL_DIR="me-cli"
+ENV_FILE="$INSTALL_DIR/.env"
 
-class MeCLIManager:
-    def __init__(self):
-        self.script_name = "main.py"
-        self.repo_url = "https://github.com/purplemashu/me-cli"
-        self.install_dir = Path("me-cli")
-        self.env_file = self.install_dir / ".env"
-        self.colors = Colors()
-        
-    def clear_screen(self):
-        os.system('cls' if os.name == 'nt' else 'clear')
+# Functions
+print_color() {
+    echo -e "${1}${2}${END}"
+}
+
+print_success() {
+    print_color "$GREEN" "✅ $1"
+}
+
+print_error() {
+    print_color "$RED" "❌ $1"
+}
+
+print_warning() {
+    print_color "$YELLOW" "⚠️  $1"
+}
+
+print_info() {
+    print_color "$BLUE" "🧋 $1"
+}
+
+clear_screen() {
+    clear
+}
+
+display_banner() {
+    clear_screen
+    echo -e "${MAGENTA}${BOLD}"
+    echo "╔══════════════════════════════════════╗"
+    echo "║           ME-CLI MANAGER             ║"
+    echo "║        Auto Install & Update         ║"
+    echo "╚══════════════════════════════════════╝"
+    echo -e "${END}"
+}
+
+check_status() {
+    if [ -d "$INSTALL_DIR" ]; then
+        INSTALLED=1
+        if [ -f "$ENV_FILE" ]; then
+            ENV_SETUP=1
+        else
+            ENV_SETUP=0
+        fi
+        if [ -f "$INSTALL_DIR/$SCRIPT_NAME" ]; then
+            READY=1
+        else
+            READY=0
+        fi
+    else
+        INSTALLED=0
+        ENV_SETUP=0
+        READY=0
+    fi
+}
+
+show_menu() {
+    check_status
     
-    def print_color(self, text, color):
-        print(f"{color}{text}{self.colors.END}")
+    if [ $INSTALLED -eq 1 ]; then
+        STATUS_ICON="✅"
+        STATUS_TEXT="${GREEN}Aktif${END}"
+    else
+        STATUS_ICON="❌"
+        STATUS_TEXT="${RED}Tidak Aktif${END}"
+    fi
     
-    def print_header(self, text):
-        print(f"\n{self.colors.CYAN}{self.colors.BOLD}{'='*60}{self.colors.END}")
-        print(f"{self.colors.CYAN}{self.colors.BOLD}🎯 {text}{self.colors.END}")
-        print(f"{self.colors.CYAN}{self.colors.BOLD}{'='*60}{self.colors.END}")
+    echo -e "${CYAN}📋 MENU UTAMA:${END}"
+    echo
+    echo -e "1. ${GREEN}📥 INSTALL ME-CLI${END}       $STATUS_ICON $STATUS_TEXT"
+    echo -e "2. ${YELLOW}🔄 UPDATE ME-CLI${END}"
+    echo -e "3. ${BLUE}🚀 JALANKAN ME-CLI${END}"
+    echo -e "4. ${MAGENTA}⚙️  SETUP ENVIRONMENT${END}"
+    echo -e "5. ${CYAN}ℹ️  INFO & BANTUAN${END}"
+    echo -e "0. ${RED}❌ KELUAR${END}"
+    echo
+    echo -n -e "${YELLOW}Pilih menu (0-5): ${END}"
+}
+
+install_me_cli() {
+    clear_screen
+    echo -e "${CYAN}🚀 MEMULAI INSTALASI ME-CLI...${END}"
+    echo -e "${YELLOW}Pastikan koneksi internet stabil!${END}"
+    echo
     
-    def print_success(self, text):
-        print(f"{self.colors.GREEN}✅ {text}{self.colors.END}")
+    commands=(
+        "apt update && apt full-upgrade -y"
+        "pkg install git -y"
+        "pkg install python -y"
+        "apt install python-pillow -y"
+        "git clone $REPO_URL"
+        "cd $INSTALL_DIR && pip install -r requirements.txt"
+    )
     
-    def print_error(self, text):
-        print(f"{self.colors.RED}❌ {text}{self.colors.END}")
+    descriptions=(
+        "Update system packages"
+        "Install Git"
+        "Install Python"
+        "Install Python Pillow"
+        "Clone repository me-cli"
+        "Install Python requirements"
+    )
     
-    def print_warning(self, text):
-        print(f"{self.colors.YELLOW}⚠️  {text}{self.colors.END}")
+    for i in "${!commands[@]}"; do
+        cmd="${commands[$i]}"
+        desc="${descriptions[$i]}"
+        
+        print_info "$desc..."
+        echo -e "${YELLOW}\$ $cmd${END}"
+        
+        if eval "$cmd"; then
+            print_success "Berhasil"
+        else
+            print_error "Gagal"
+            print_warning "Lanjutkan ke step berikutnya..."
+        fi
+        
+        echo
+    done
     
-    def print_info(self, text):
-        print(f"{self.colors.BLUE}🧋 {text}{self.colors.END}")
+    print_success "INSTALASI SELESAI!"
+    echo -e "${YELLOW}Tekan Enter untuk kembali ke menu...${END}"
+    read
+}
+
+update_me_cli() {
+    clear_screen
+    if [ ! -d "$INSTALL_DIR" ]; then
+        print_error "me-cli belum terinstall!"
+        echo -e "${YELLOW}Tekan Enter untuk kembali...${END}"
+        read
+        return
+    fi
     
-    def display_banner(self):
-        banner = f"""
-{self.colors.MAGENTA}{self.colors.BOLD}
-╔══════════════════════════════════════════════╗
-║                {self.colors.CYAN}ME-CLI MANAGER{self.colors.MAGENTA}                 ║
-║           {self.colors.YELLOW}Auto Install & Update Tool{self.colors.MAGENTA}          ║
-╚══════════════════════════════════════════════╝
-{self.colors.END}"""
-        print(banner)
-        
-        info = f"""
-{self.colors.YELLOW}{self.colors.BOLD}⚠️  PERINGATAN PENTING ⚠️{self.colors.END}
-{self.colors.RED}JANGAN SKIP SATU COMMAND PUN!{self.colors.END}
-{self.colors.CYAN}Banyak yang sok paham & skip command, akhirnya stuck!{self.colors.END}
-"""
-        print(info)
-
-    def check_installation_status(self):
-        status = {
-            'installed': False,
-            'env_setup': False,
-            'ready_to_run': False
-        }
-        
-        if self.install_dir.exists():
-            status['installed'] = True
-            if self.env_file.exists():
-                status['env_setup'] = True
-            if (self.install_dir / self.script_name).exists():
-                status['ready_to_run'] = True
-                
-        return status
+    echo -e "${CYAN}🔄 MEMPERBARUI ME-CLI...${END}"
+    echo
     
-    def get_status_icon(self, condition):
-        if condition:
-            return f"{self.colors.GREEN}✅{self.colors.END}"
-        else:
-            return f"{self.colors.RED}❌{self.colors.END}"
+    commands=(
+        "cd $INSTALL_DIR && git pull --rebase"
+        "cd $INSTALL_DIR && pip install -r requirements.txt"
+    )
     
-    def get_status_text(self, condition, true_text="Aktif", false_text="Tidak Aktif"):
-        if condition:
-            return f"{self.colors.GREEN}{true_text}{self.colors.END}"
-        else:
-            return f"{self.colors.RED}{false_text}{self.colors.END}"
+    for cmd in "${commands[@]}"; do
+        echo -e "${YELLOW}\$ $cmd${END}"
+        if eval "$cmd"; then
+            print_success "Berhasil"
+        else
+            print_error "Gagal"
+        fi
+        echo
+    done
     
-    def show_menu(self):
-        status = self.check_installation_status()
-        
-        menu = f"""
-{self.colors.BOLD}{self.colors.CYAN}📋 PILIH MENU:{self.colors.END}
+    print_success "UPDATE SELESAI!"
+    echo -e "${YELLOW}Tekan Enter untuk kembali...${END}"
+    read
+}
 
-{self.colors.WHITE}1. 📥 {self.colors.BOLD}INSTALL ME-CLI{self.colors.END}       {self.get_status_icon(status['installed'])} {self.get_status_text(status['installed'], 'Terinstall', 'Belum Install')}
-{self.colors.WHITE}2. 🔄 {self.colors.BOLD}UPDATE ME-CLI{self.colors.END}        {self.get_status_icon(status['installed'])} {self.get_status_text(status['installed'], 'Bisa Update', 'Install Dulu')}
-{self.colors.WHITE}3. 🚀 {self.colors.BOLD}JALANKAN ME-CLI{self.colors.END}      {self.get_status_icon(status['ready_to_run'])} {self.get_status_text(status['ready_to_run'], 'Siap Jalankan', 'Belum Siap')}
-{self.colors.WHITE}4. ⚙️  {self.colors.BOLD}SETUP ENVIRONMENT{self.colors.END}   {self.get_status_icon(status['env_setup'])} {self.get_status_text(status['env_setup'], 'Sudah Setup', 'Perlu Setup')}
-{self.colors.WHITE}5. ℹ️  {self.colors.BOLD}INFO & TROUBLESHOOT{self.colors.END}
-{self.colors.WHITE}*. ❌ {self.colors.BOLD}EXIT{self.colors.END}
-
-{self.colors.BOLD}🎯 STATUS:{self.colors.END} {self.get_overall_status(status)}
-
-{self.colors.YELLOW}Masukkan pilihan (1-6): {self.colors.END}"""
-        return input(menu)
+run_me_cli() {
+    clear_screen
+    if [ ! -d "$INSTALL_DIR" ]; then
+        print_error "me-cli belum terinstall!"
+        echo -e "${YELLOW}Tekan Enter untuk kembali...${END}"
+        read
+        return
+    fi
     
-    def get_overall_status(self, status):
-        if status['ready_to_run'] and status['env_setup']:
-            return f"{self.colors.GREEN}{self.colors.BOLD}🟢 READY TO RUN{self.colors.END}"
-        elif status['installed']:
-            return f"{self.colors.YELLOW}{self.colors.BOLD}🟡 INSTALLED (But needs setup){self.colors.END}"
-        else:
-            return f"{self.colors.RED}{self.colors.BOLD}🔴 NOT INSTALLED{self.colors.END}"
+    echo -e "${CYAN}🚀 MENJALANKAN ME-CLI...${END}"
+    echo -e "${YELLOW}Tekan Ctrl+C untuk berhenti${END}"
+    echo
+    
+    if [ -f "$INSTALL_DIR/$SCRIPT_NAME" ]; then
+        cd "$INSTALL_DIR" && python "$SCRIPT_NAME"
+        cd ..
+    else
+        print_error "File $SCRIPT_NAME tidak ditemukan!"
+    fi
+    
+    echo
+    echo -e "${YELLOW}Tekan Enter untuk kembali...${END}"
+    read
+}
 
-    def run_command_manual(self, command, description):
-        """Jalankan command dengan output manual"""
-        self.print_info(description)
-        print(f"{self.colors.CYAN}Command: {self.colors.YELLOW}{command}{self.colors.END}")
-        print(f"{self.colors.CYAN}{'-'*50}{self.colors.END}")
-        
-        try:
-            # Jalankan command dan tampilkan output real-time
-            process = subprocess.Popen(
-                command,
-                shell=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                universal_newlines=True,
-                bufsize=1,
-                universal_newlines=True
-            )
-            
-            # Tampilkan output real-time
-            for line in process.stdout:
-                print(f"{self.colors.WHITE}{line}{self.colors.END}", end='', flush=True)
-            
-            process.wait()
-            
-            if process.returncode == 0:
-                self.print_success(f"Berhasil: {description}")
-                return True
-            else:
-                self.print_error(f"Gagal: {description}")
-                return False
-                
-        except Exception as e:
-            self.print_error(f"Error: {e}")
-            return False
+setup_environment() {
+    clear_screen
+    if [ ! -d "$INSTALL_DIR" ]; then
+        print_error "Install me-cli dulu!"
+        echo -e "${YELLOW}Tekan Enter untuk kembali...${END}"
+        read
+        return
+    fi
+    
+    echo -e "${CYAN}⚙️  SETUP ENVIRONMENT VARIABLES${END}"
+    echo
+    echo -e "${GREEN}1. Buka: ${WHITE}https://rentry.co/me-cli${END}"
+    echo -e "${GREEN}2. Copy semua text${END}"
+    echo -e "${GREEN}3. Buat file .env di folder me-cli${END}"
+    echo
+    echo -e "${YELLOW}Command manual:${END}"
+    echo -e "${WHITE}nano $INSTALL_DIR/.env${END}"
+    echo -e "${WHITE}# Paste content, lalu Ctrl+X → Y → Enter${END}"
+    echo
+    
+    echo -e "${YELLOW}Tekan Enter untuk membuka browser...${END}"
+    read
+    termux-open-url "https://rentry.co/me-cli"
+    
+    echo
+    echo -e "${YELLOW}Setelah selesai setup, tekan Enter untuk kembali...${END}"
+    read
+}
 
-    def install_me_cli(self):
-        self.print_header("PROSES INSTALASI ME-CLI - JANGAN SKIP SATU PUN!")
-        
-        # Konfirmasi user
-        print(f"{self.colors.RED}{self.colors.BOLD}⚠️  PASTIKAN KONEKSI INTERNET STABIL!{self.colors.END}")
-        print(f"{self.colors.YELLOW}Proses ini akan menjalankan SEMUA command wajib:{self.colors.END}")
-        
-        commands = [
-            "apt update && apt full-upgrade -y",
-            "pkg install git -y", 
-            "pkg install python -y",
-            "apt install python-pillow -y",
-            f"git clone {self.repo_url}",
-            "cd me-cli && pip install -r requirements.txt",
-            "cd me-cli && python main.py --test"
-        ]
-        
-        for i, cmd in enumerate(commands, 1):
-            print(f"{self.colors.CYAN}{i}. {cmd}{self.colors.END}")
-        
-        confirm = input(f"\n{self.colors.YELLOW}Lanjutkan instalasi? (y/N): {self.colors.END}")
-        if confirm.lower() != 'y':
-            self.print_warning("Instalasi dibatalkan!")
-            input(f"{self.colors.YELLOW}Tekan Enter untuk kembali...{self.colors.END}")
-            return
-        
-        try:
-            # 1. UPDATE SYSTEM
-            self.print_header("1. UPDATE SYSTEM")
-            if not self.run_command_manual(
-                "apt update && apt full-upgrade -y",
-                "Update system packages (Wajib!)"
-            ):
-                self.print_error("GAGAL update system! Coba jalankan manual:")
-                print(f"{self.colors.YELLOW}apt update && apt full-upgrade{self.colors.END}")
-                return
-            
-            # 2. INSTALL GIT
-            self.print_header("2. INSTALL GIT")
-            if not self.run_command_manual(
-                "pkg install git -y", 
-                "Install Git (Wajib!)"
-            ):
-                self.print_error("GAGAL install Git!")
-                return
-            
-            # 3. INSTALL PYTHON
-            self.print_header("3. INSTALL PYTHON") 
-            if not self.run_command_manual(
-                "pkg install python -y",
-                "Install Python (Wajib!)"
-            ):
-                self.print_error("GAGAL install Python!")
-                return
-            
-            # 4. INSTALL PILLOW
-            self.print_header("4. INSTALL PILLOW")
-            if not self.run_command_manual(
-                "apt install python-pillow -y",
-                "Install Python Pillow (Wajib!)"
-            ):
-                self.print_warning("Pillow mungkin sudah terinstall, lanjutkan...")
-            
-            # 5. CLONE REPOSITORY
-            self.print_header("5. CLONE REPOSITORY")
-            if self.install_dir.exists():
-                self.print_warning("Folder me-cli sudah ada, menghapus...")
-                os.system("rm -rf me-cli")
-            
-            if not self.run_command_manual(
-                f"git clone {self.repo_url}",
-                "Clone repository me-cli (Wajib!)"
-            ):
-                self.print_error("GAGAL clone repository!")
-                return
-            
-            # 6. INSTALL REQUIREMENTS
-            self.print_header("6. INSTALL PYTHON REQUIREMENTS")
-            if not self.run_command_manual(
-                "cd me-cli && pip install -r requirements.txt",
-                "Install semua dependencies Python (Wajib!)"
-            ):
-                self.print_error("GAGAL install requirements!")
-                self.print_info("Coba manual: cd me-cli && pip install -r requirements.txt")
-                return
-            
-            # 7. TEST JALANKAN SCRIPT
-            self.print_header("7. TEST JALANKAN SCRIPT")
-            self.print_info("Testing apakah script bisa jalan...")
-            
-            # Cek apakah main.py ada
-            if (self.install_dir / "main.py").exists():
-                self.print_success("main.py ditemukan!")
-                
-                # Try to run with --help or --version
-                result = subprocess.run(
-                    ["cd me-cli && python main.py --help"],
-                    shell=True,
-                    capture_output=True,
-                    text=True,
-                    timeout=10
-                )
-                
-                if result.returncode == 0:
-                    self.print_success("Script berhasil dijalankan!")
-                    print(f"{self.colors.WHITE}{result.stdout}{self.colors.END}")
-                else:
-                    self.print_warning("Script mungkin butuh environment variables")
-                    print(f"{self.colors.YELLOW}Lanjutkan ke setup environment...{self.colors.END}")
-            else:
-                self.print_error("main.py tidak ditemukan!")
-                return
-            
-            # FINAL SUCCESS
-            self.print_header("🎉 INSTALASI BERHASIL!")
-            self.print_success("Semua command wajib telah dijalankan!")
-            
-            print(f"\n{self.colors.BOLD}📋 Langkah selanjutnya:{self.colors.END}")
-            print(f"{self.colors.GREEN}1. Setup Environment Variables (Menu 4) - WAJIB!{self.colors.END}")
-            print(f"{self.colors.GREEN}2. Jalankan me-cli (Menu 3){self.colors.END}")
-            
-            print(f"\n{self.colors.BOLD}📍 Lokasi:{self.colors.END}")
-            print(f"{self.colors.CYAN}{self.install_dir.absolute()}{self.colors.END}")
-            
-        except Exception as e:
-            self.print_error(f"Error: {e}")
-            self.print_info("Jika ada error, screenshot dan tanyakan di grup!")
-        
-        input(f"\n{self.colors.YELLOW}Tekan Enter untuk kembali ke menu...{self.colors.END}")
+show_info() {
+    clear_screen
+    echo -e "${CYAN}ℹ️  INFO & BANTUAN${END}"
+    echo
+    echo -e "${GREEN}📚 First Time Install:${END}"
+    echo -e "${WHITE}apt update && apt full-upgrade${END}"
+    echo -e "${WHITE}pkg install git${END}"
+    echo -e "${WHITE}pkg install python${END}"
+    echo -e "${WHITE}apt install python-pillow${END}"
+    echo -e "${WHITE}git clone https://github.com/purplemashu/me-cli${END}"
+    echo -e "${WHITE}cd me-cli && pip install -r requirements.txt${END}"
+    echo -e "${WHITE}python main.py${END}"
+    echo
+    echo -e "${RED}🚫 JANGAN SKIP SATU COMMAND PUN!${END}"
+    echo
+    echo -e "${GREEN}🔄 Update:${END}"
+    echo -e "${WHITE}cd me-cli && git pull --rebase${END}"
+    echo -e "${WHITE}cd me-cli && pip install -r requirements.txt${END}"
+    echo
+    echo -e "${GREEN}🔧 Environment:${END}"
+    echo -e "${WHITE}https://rentry.co/me-cli${END}"
+    echo
+    
+    echo -e "${YELLOW}Tekan Enter untuk kembali...${END}"
+    read
+}
 
-    def update_me_cli(self):
-        self.print_header("UPDATE ME-CLI")
+# Main menu loop
+main() {
+    while true; do
+        display_banner
+        show_menu
+        read choice
         
-        if not self.install_dir.exists():
-            self.print_error("me-cli belum terinstall!")
-            return
-        
-        commands = [
-            "cd me-cli && git pull --rebase",
-            "cd me-cli && pip install -r requirements.txt"
-        ]
-        
-        for cmd in commands:
-            if not self.run_command_manual(cmd, f"Update: {cmd}"):
-                self.print_error("Update gagal!")
-                return
-        
-        self.print_success("Update berhasil!")
+        case $choice in
+            1)
+                install_me_cli
+                ;;
+            2)
+                update_me_cli
+                ;;
+            3)
+                run_me_cli
+                ;;
+            4)
+                setup_environment
+                ;;
+            5)
+                show_info
+                ;;
+            0)
+                echo -e "${GREEN}👋 Sampai jumpa!${END}"
+                exit 0
+                ;;
+            *)
+                print_error "Pilihan tidak valid!"
+                sleep 1
+                ;;
+        esac
+    done
+}
 
-    def setup_environment(self):
-        self.print_header("SETUP ENVIRONMENT VARIABLES")
-        
-        if not self.install_dir.exists():
-            self.print_error("Install dulu!")
-            return
-        
-        self.print_info("1. Buka: https://rentry.co/me-cli")
-        self.print_info("2. Copy semua text")
-        self.print_info("3. Buat file .env di folder me-cli")
-        
-        input(f"{self.colors.YELLOW}Tekan Enter setelah buka link...{self.colors.END}")
-        os.system("termux-open-url https://rentry.co/me-cli")
-        
-        self.print_info("Buat file .env:")
-        print(f"{self.colors.YELLOW}nano me-cli/.env{self.colors.END}")
-        print(f"{self.colors.YELLOW}# Paste content dari rentry.co{self.colors.END}")
-        print(f"{self.colors.YELLOW}# Ctrl+X → Y → Enter{self.colors.END}")
-        
-        input(f"{self.colors.YELLOW}Tekan Enter setelah setup...{self.colors.END}")
+# Handle Ctrl+C
+trap 'echo -e "\n${RED}❌ Dihentikan oleh user${END}"; exit 1' INT
 
-    def run_me_cli(self):
-        self.print_header("JALANKAN ME-CLI")
-        
-        if not self.install_dir.exists():
-            self.print_error("Install dulu!")
-            return
-        
-        self.print_info("Menjalankan me-cli...")
-        os.system("cd me-cli && python main.py")
-
-    def script_info(self):
-        self.print_header("INFO & TROUBLESHOOT")
-        
-        print(f"""
-{self.colors.BOLD}🧋 FIRST TIME INSTALL (WAJIB URUT):{self.colors.END}
-{self.colors.CYAN}1. apt update && apt full-upgrade{self.colors.END}
-{self.colors.CYAN}2. pkg install git{self.colors.END}  
-{self.colors.CYAN}3. pkg install python{self.colors.END}
-{self.colors.CYAN}4. apt install python-pillow{self.colors.END}
-{self.colors.CYAN}5. git clone https://github.com/purplemashu/me-cli{self.colors.END}
-{self.colors.CYAN}6. cd me-cli && pip install -r requirements.txt{self.colors.END}
-{self.colors.CYAN}7. python main.py{self.colors.END}
-
-{self.colors.RED}🚫 JANGAN SKIP SATU COMMAND PUN!{self.colors.END}
-{self.colors.YELLOW}Banyak yang sok paham & skip command, akhirnya stuck!{self.colors.END}
-""")
-
-    def main(self):
-        try:
-            while True:
-                self.clear_screen()
-                self.display_banner()
-                
-                choice = self.show_menu()
-                
-                if choice == '1':
-                    self.install_me_cli()
-                elif choice == '2':
-                    self.update_me_cli()
-                elif choice == '3':
-                    self.run_me_cli()
-                elif choice == '4':
-                    self.setup_environment()
-                elif choice == '5':
-                    self.script_info()
-                    input(f"\n{self.colors.YELLOW}Tekan Enter...{self.colors.END}")
-                elif choice == '6':
-                    self.print_success("Goodbye! 👋")
-                    break
-                else:
-                    self.print_error("Pilihan salah!")
-                    time.sleep(1)
-                    
-        except KeyboardInterrupt:
-            self.print_error("\nDihentikan!")
-            sys.exit(0)
-
-if __name__ == "__main__":
-    manager = MeCLIManager()
-    manager.main()
+# Run main function
+main
