@@ -54,33 +54,34 @@ display_banner() {
 }
 
 check_status() {
+    # Reset status
+    INSTALLED=0
+    ENV_SETUP=0
+    READY=0
+    
+    # Check if installed
     if [ -d "$INSTALL_DIR" ]; then
         INSTALLED=1
+        # Check if env file exists
         if [ -f "$ENV_FILE" ]; then
             ENV_SETUP=1
-        else
-            ENV_SETUP=0
         fi
+        # Check if main.py exists and can run
         if [ -f "$INSTALL_DIR/$SCRIPT_NAME" ]; then
             READY=1
-        else
-            READY=0
         fi
-    else
-        INSTALLED=0
-        ENV_SETUP=0
-        READY=0
     fi
 }
 
 show_menu() {
     check_status
     
+    # Status display
     if [ $INSTALLED -eq 1 ]; then
-        STATUS_ICON="✅"
+        STATUS_ICON="${GREEN}✅${END}"
         STATUS_TEXT="${GREEN}Terinstall${END}"
     else
-        STATUS_ICON="❌"
+        STATUS_ICON="${RED}❌${END}"
         STATUS_TEXT="${RED}Belum Install${END}"
     fi
     
@@ -90,10 +91,11 @@ show_menu() {
     echo -e "2. ${YELLOW}🔄 UPDATE ME-CLI${END}"
     echo -e "3. ${BLUE}🚀 JALANKAN ME-CLI${END}"
     echo -e "4. ${MAGENTA}⚙️  SETUP ENVIRONMENT${END}"
-    echo -e "5. ${CYAN}ℹ️  INFO & BANTUAN${END}"
+    echo -e "5. ${CYAN}🎯 MENU DOR (python main.py)${END}"
+    echo -e "6. ${WHITE}ℹ️  INFO & BANTUAN${END}"
     echo -e "0. ${RED}❌ KELUAR${END}"
     echo
-    echo -n -e "${YELLOW}Pilih menu (0-5): ${END}"
+    echo -n -e "${YELLOW}Pilih menu (0-6): ${END}"
 }
 
 run_command() {
@@ -104,29 +106,26 @@ run_command() {
     echo -e "${YELLOW}╰→ \$ $cmd${END}"
     echo -e "${CYAN}----------------------------------------${END}"
     
-    # Execute command and capture output
-    if eval "$cmd" 2>&1 | while IFS= read -r line; do
-        echo -e "${WHITE}$line${END}"
-    done; then
+    # Execute command
+    if eval "$cmd > /dev/null 2>&1"; then
         print_success "Berhasil: $desc"
+        echo
         return 0
     else
         print_error "Gagal: $desc"
+        echo
         return 1
     fi
-    echo
 }
 
 install_me_cli() {
     clear_screen
     echo -e "${CYAN}🚀 MEMULAI INSTALASI ME-CLI...${END}"
-    echo -e "${YELLOW}Pastikan koneksi internet stabil!${END}"
-    echo
     echo -e "${RED}⚠️  JANGAN SKIP SATU COMMAND PUN!${END}"
     echo
     
     # Confirmation
-    echo -e "${YELLOW}Apakah Anda yakin ingin melanjutkan instalasi? (y/N): ${END}"
+    echo -n -e "${YELLOW}Apakah Anda yakin ingin melanjutkan instalasi? (y/N): ${END}"
     read -r confirm
     if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
         print_warning "Instalasi dibatalkan!"
@@ -135,93 +134,51 @@ install_me_cli() {
         return
     fi
     
-    # Step 1: Update system
-    if ! run_command "apt update && apt full-upgrade -y" "Update system packages"; then
-        print_error "Gagal update system!"
-        echo -e "${YELLOW}Tekan Enter untuk kembali...${END}"
-        read
-        return
-    fi
-    
-    # Step 2: Install Git
-    if ! run_command "pkg install git -y" "Install Git"; then
-        print_error "Gagal install Git!"
-        echo -e "${YELLOW}Tekan Enter untuk kembali...${END}"
-        read
-        return
-    fi
-    
-    # Step 3: Install Python
-    if ! run_command "pkg install python -y" "Install Python"; then
-        print_error "Gagal install Python!"
-        echo -e "${YELLOW}Tekan Enter untuk kembali...${END}"
-        read
-        return
-    fi
-    
-    # Step 4: Install Pillow
-    if ! run_command "apt install python-pillow -y" "Install Python Pillow"; then
-        print_warning "Pillow mungkin sudah terinstall, lanjutkan..."
-    fi
-    
-    # Step 5: Clone repository
+    # Remove existing directory
     if [ -d "$INSTALL_DIR" ]; then
-        print_warning "Folder $INSTALL_DIR sudah ada, menghapus..."
+        print_warning "Menghapus folder lama..."
         rm -rf "$INSTALL_DIR"
     fi
     
-    if ! run_command "git clone $REPO_URL" "Clone repository me-cli"; then
-        print_error "Gagal clone repository!"
-        echo -e "${YELLOW}Tekan Enter untuk kembali...${END}"
-        read
-        return
-    fi
+    # Installation commands for Linux
+    commands=(
+        "sudo apt update && sudo apt upgrade -y"
+        "sudo apt install git -y"
+        "sudo apt install python3 python3-pip -y"
+        "sudo apt install python3-pil -y"
+        "git clone $REPO_URL"
+        "cd $INSTALL_DIR && pip3 install -r requirements.txt"
+    )
     
-    # Step 6: Install requirements
-    if [ -d "$INSTALL_DIR" ]; then
-        if ! run_command "cd $INSTALL_DIR && pip install -r requirements.txt" "Install Python requirements"; then
-            print_warning "Coba install requirements manual..."
-            run_command "cd $INSTALL_DIR && pip install requests colorama pillow python-dotenv" "Install packages manual"
-        fi
-    else
-        print_error "Folder $INSTALL_DIR tidak ditemukan!"
-        echo -e "${YELLOW}Tekan Enter untuk kembali...${END}"
-        read
-        return
-    fi
+    descriptions=(
+        "Update system packages"
+        "Install Git"
+        "Install Python3 dan pip3"
+        "Install Python Pillow"
+        "Clone repository me-cli"
+        "Install Python requirements"
+    )
     
-    # Step 7: Test run
-    print_info "Testing instalasi..."
-    if [ -f "$INSTALL_DIR/$SCRIPT_NAME" ]; then
-        print_success "File $SCRIPT_NAME ditemukan!"
-        echo -e "${YELLOW}Menjalankan test...${END}"
+    # Run all commands
+    for i in "${!commands[@]}"; do
+        cmd="${commands[$i]}"
+        desc="${descriptions[$i]}"
         
-        # Try to run the script
-        cd "$INSTALL_DIR"
-        if python --version > /dev/null 2>&1; then
-            print_success "Python berhasil diakses"
-            if timeout 10s python -c "print('Test berhasil!')" 2>/dev/null; then
-                print_success "Script siap dijalankan!"
-            else
-                print_warning "Script mungkin butuh environment variables"
-            fi
-        else
-            print_error "Python tidak bisa diakses"
+        if ! run_command "$cmd" "$desc"; then
+            print_warning "Lanjutkan ke step berikutnya..."
         fi
-        cd ..
+        sleep 1
+    done
+    
+    # Verify installation
+    print_info "Verifikasi instalasi..."
+    if [ -f "$INSTALL_DIR/$SCRIPT_NAME" ]; then
+        print_success "✅ ME-CLI berhasil diinstall!"
+        echo -e "${GREEN}Lokasi: $(pwd)/$INSTALL_DIR${END}"
     else
-        print_error "File $SCRIPT_NAME tidak ditemukan!"
+        print_error "❌ Instalasi gagal! File main.py tidak ditemukan."
     fi
     
-    # Final message
-    echo
-    echo -e "${GREEN}========================================${END}"
-    print_success "🎉 INSTALASI SELESAI!"
-    echo -e "${GREEN}========================================${END}"
-    echo
-    echo -e "${CYAN}📋 Langkah selanjutnya:${END}"
-    echo -e "${WHITE}1. Setup Environment Variables (Menu 4)${END}"
-    echo -e "${WHITE}2. Jalankan me-cli (Menu 3)${END}"
     echo
     echo -e "${YELLOW}Tekan Enter untuk kembali ke menu...${END}"
     read
@@ -239,24 +196,19 @@ update_me_cli() {
     echo -e "${CYAN}🔄 MEMPERBARUI ME-CLI...${END}"
     echo
     
-    # Update from git
-    if run_command "cd $INSTALL_DIR && git pull --rebase" "Update dari GitHub"; then
-        print_success "Update code berhasil"
-    else
-        print_warning "Coba metode alternatif..."
-        run_command "cd $INSTALL_DIR && git fetch --all && git reset --hard origin/main" "Force update"
-    fi
+    commands=(
+        "cd $INSTALL_DIR && git pull --rebase"
+        "cd $INSTALL_DIR && pip3 install -r requirements.txt --upgrade"
+    )
     
-    # Update requirements
-    if run_command "cd $INSTALL_DIR && pip install -r requirements.txt" "Update dependencies"; then
-        print_success "Update dependencies berhasil"
-    else
-        print_warning "Coba update pip manual"
-        run_command "cd $INSTALL_DIR && pip install --upgrade pip" "Update pip"
-        run_command "cd $INSTALL_DIR && pip install -r requirements.txt --force-reinstall" "Reinstall requirements"
-    fi
+    for cmd in "${commands[@]}"; do
+        if run_command "$cmd" "Update"; then
+            print_success "Update berhasil"
+        else
+            print_warning "Ada masalah, tapi dilanjutkan..."
+        fi
+    done
     
-    print_success "UPDATE SELESAI!"
     echo -e "${YELLOW}Tekan Enter untuk kembali...${END}"
     read
 }
@@ -284,7 +236,7 @@ run_me_cli() {
     
     # Run the script
     cd "$INSTALL_DIR"
-    python "$SCRIPT_NAME"
+    python3 "$SCRIPT_NAME"
     cd ..
     
     echo
@@ -321,12 +273,64 @@ setup_environment() {
     
     echo -e "${YELLOW}Tekan Enter untuk membuka browser...${END}"
     read
-    termux-open-url "https://rentry.co/me-cli" 2>/dev/null || \
-    xdg-open "https://rentry.co/me-cli" 2>/dev/null || \
-    echo -e "${RED}Tidak bisa membuka browser, buka manual: https://rentry.co/me-cli${END}"
+    xdg-open "https://rentry.co/me-cli" 2>/dev/null || echo -e "${RED}Buka manual: https://rentry.co/me-cli${END}"
     
     echo
     echo -e "${YELLOW}Setelah selesai setup, tekan Enter untuk kembali...${END}"
+    read
+}
+
+show_dor_menu() {
+    clear_screen
+    if [ ! -d "$INSTALL_DIR" ]; then
+        print_error "Install me-cli dulu!"
+        echo -e "${YELLOW}Tekan Enter untuk kembali...${END}"
+        read
+        return
+    fi
+    
+    echo -e "${CYAN}🎯 MENU DOR - python main.py${END}"
+    echo
+    echo -e "${GREEN}Pilih opsi:${END}"
+    echo -e "1. ${YELLOW}Jalankan normal (python main.py)${END}"
+    echo -e "2. ${YELLOW}Jalankan dengan debug${END}"
+    echo -e "3. ${YELLOW}Jalankan dengan options khusus${END}"
+    echo -e "0. ${RED}Kembali ke menu utama${END}"
+    echo
+    echo -n -e "${YELLOW}Pilih opsi (0-3): ${END}"
+    read -r dor_choice
+    
+    case $dor_choice in
+        1)
+            echo -e "${CYAN}🚀 Menjalankan: python main.py${END}"
+            cd "$INSTALL_DIR"
+            python3 main.py
+            cd ..
+            ;;
+        2)
+            echo -e "${CYAN}🐛 Menjalankan: python main.py --debug${END}"
+            cd "$INSTALL_DIR"
+            python3 main.py --debug
+            cd ..
+            ;;
+        3)
+            echo -n -e "${YELLOW}Masukkan options: ${END}"
+            read -r options
+            echo -e "${CYAN}🚀 Menjalankan: python main.py $options${END}"
+            cd "$INSTALL_DIR"
+            python3 main.py $options
+            cd ..
+            ;;
+        0)
+            return
+            ;;
+        *)
+            print_error "Pilihan tidak valid!"
+            ;;
+    esac
+    
+    echo
+    echo -e "${YELLOW}Tekan Enter untuk kembali...${END}"
     read
 }
 
@@ -334,23 +338,30 @@ show_info() {
     clear_screen
     echo -e "${CYAN}ℹ️  INFO & BANTUAN${END}"
     echo
-    echo -e "${GREEN}📚 First Time Install (WAJIB URUT):${END}"
-    echo -e "${WHITE}1. apt update && apt full-upgrade${END}"
-    echo -e "${WHITE}2. pkg install git${END}"
-    echo -e "${WHITE}3. pkg install python${END}"
-    echo -e "${WHITE}4. apt install python-pillow${END}"
+    
+    check_status
+    echo -e "${GREEN}📊 STATUS SAAT INI:${END}"
+    echo -e "Installed: $([ $INSTALLED -eq 1 ] && echo "✅" || echo "❌")"
+    echo -e "Env Setup: $([ $ENV_SETUP -eq 1 ] && echo "✅" || echo "❌")"
+    echo -e "Ready: $([ $READY -eq 1 ] && echo "✅" || echo "❌")"
+    echo
+    
+    echo -e "${GREEN}📚 FIRST TIME INSTALL (WAJIB URUT):${END}"
+    echo -e "${WHITE}1. sudo apt update && sudo apt upgrade -y${END}"
+    echo -e "${WHITE}2. sudo apt install git -y${END}"
+    echo -e "${WHITE}3. sudo apt install python3 python3-pip -y${END}"
+    echo -e "${WHITE}4. sudo apt install python3-pil -y${END}"
     echo -e "${WHITE}5. git clone https://github.com/purplemashu/me-cli${END}"
-    echo -e "${WHITE}6. cd me-cli && pip install -r requirements.txt${END}"
-    echo -e "${WHITE}7. python main.py${END}"
+    echo -e "${WHITE}6. cd me-cli && pip3 install -r requirements.txt${END}"
+    echo -e "${WHITE}7. python3 main.py${END}"
     echo
     echo -e "${RED}🚫 JANGAN SKIP SATU COMMAND PUN!${END}"
-    echo -e "${YELLOW}Banyak yang sok paham & skip command, akhirnya stuck!${END}"
     echo
-    echo -e "${GREEN}🔄 Update:${END}"
+    echo -e "${GREEN}🔄 UPDATE:${END}"
     echo -e "${WHITE}cd me-cli && git pull --rebase${END}"
-    echo -e "${WHITE}cd me-cli && pip install -r requirements.txt${END}"
+    echo -e "${WHITE}cd me-cli && pip3 install -r requirements.txt${END}"
     echo
-    echo -e "${GREEN}🔧 Environment:${END}"
+    echo -e "${GREEN}🔧 ENVIRONMENT:${END}"
     echo -e "${WHITE}https://rentry.co/me-cli${END}"
     echo
     
@@ -379,6 +390,9 @@ main() {
                 setup_environment
                 ;;
             5)
+                show_dor_menu
+                ;;
+            6)
                 show_info
                 ;;
             0)
