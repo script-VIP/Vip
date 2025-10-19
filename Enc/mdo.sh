@@ -7,6 +7,9 @@ YELLOW='\033[93m'
 BLUE='\033[94m'
 CYAN='\033[96m'
 MAGENTA='\033[95m'
+ORANGE='\033[38;5;208m'
+PURPLE='\033[38;5;165m'
+BOLD='\033[1m'
 END='\033[0m'
 
 print_color() {
@@ -21,8 +24,12 @@ print_error() {
     print_color "$RED" "❌ $1"
 }
 
+print_warning() {
+    print_color "$YELLOW" "⚠️  $1"
+}
+
 print_info() {
-    print_color "$BLUE" "🧋 $1"
+    print_color "$CYAN" "🧋 $1"
 }
 
 clear_screen() {
@@ -31,12 +38,13 @@ clear_screen() {
 
 display_banner() {
     clear_screen
-    echo -e "${MAGENTA}"
-    echo "╔══════════════════════════════════════╗"
-    echo "║             MENU DOR DOR             ║"
-    echo "║            Multi Version             ║"
-    echo "╚══════════════════════════════════════╝"
+    echo -e "${PURPLE}${BOLD}"
+    echo "╔══════════════════════════════════════════════╗"
+    echo "║                  ${CYAN}MENU DOR DOR${PURPLE}                   ║"
+    echo "║               ${ORANGE}Multi Version${PURPLE}                   ║"
+    echo "╚══════════════════════════════════════════════╝"
     echo -e "${END}"
+    echo
 }
 
 check_status() {
@@ -48,7 +56,14 @@ check_status() {
 }
 
 install_dor() {
+    echo -e "${ORANGE}${BOLD}"
+    echo "╔══════════════════════════════════════════════╗"
+    echo "║                 INSTALL DOR                  ║"
+    echo "╚══════════════════════════════════════════════╝"
+    echo -e "${END}"
+    
     echo -e "${YELLOW}🚀 Installing DOR...${END}"
+    echo
     wget -q https://raw.githubusercontent.com/Script-VIP/Vip/main/Enc/doy.sh
     chmod +x doy.sh
     ./doy.sh
@@ -61,7 +76,15 @@ run_menu_v1() {
         return
     fi
     
+    echo -e "${GREEN}${BOLD}"
+    echo "╔══════════════════════════════════════════════╗"
+    echo "║                  MENU V1                     ║"
+    echo "╚══════════════════════════════════════════════╝"
+    echo -e "${END}"
+    
     echo -e "${GREEN}🚀 Starting DOR V1...${END}"
+    echo -e "${YELLOW}Press ${RED}Ctrl+C${YELLOW} to stop${END}"
+    echo
     cd me-cli
     source venv/bin/activate
     python3 main.py
@@ -75,7 +98,15 @@ run_menu_v2() {
         return
     fi
     
+    echo -e "${CYAN}${BOLD}"
+    echo "╔══════════════════════════════════════════════╗"
+    echo "║                  MENU V2                     ║"
+    echo "╚══════════════════════════════════════════════╝"
+    echo -e "${END}"
+    
     echo -e "${CYAN}🚀 Starting DOR V2...${END}"
+    echo -e "${YELLOW}Press ${RED}Ctrl+C${YELLOW} to stop${END}"
+    echo
     ./run_dor.sh
 }
 
@@ -85,14 +116,31 @@ setup_environment() {
         return
     fi
     
-    echo -e "${YELLOW}⚙️  Setup Environment...${END}"
+    echo -e "${MAGENTA}${BOLD}"
+    echo "╔══════════════════════════════════════════════╗"
+    echo "║               SETUP ENVIRONMENT              ║"
+    echo "╚══════════════════════════════════════════════╝"
+    echo -e "${END}"
+    
+    echo -e "${MAGENTA}⚙️  Setting up environment variables...${END}"
+    echo -e "${BLUE}Editing: ${YELLOW}me-cli/.env${END}"
+    echo
     nano me-cli/.env
+    print_success "Environment updated!"
 }
 
 copy_content() {
-    echo -e "${YELLOW}📋 Copy Content...${END}"
-    echo -e "${BLUE}Open: https://rentry.co/me-cli${END}"
-    xdg-open "https://rentry.co/me-cli" 2>/dev/null || echo -e "${RED}Open manually${END}"
+    echo -e "${BLUE}${BOLD}"
+    echo "╔══════════════════════════════════════════════╗"
+    echo "║                COPY CONTENT                  ║"
+    echo "╚══════════════════════════════════════════════╝"
+    echo -e "${END}"
+    
+    echo -e "${BLUE}📋 Copy from: ${CYAN}https://rentry.co/me-cli${END}"
+    echo
+    echo -e "${YELLOW}Opening browser...${END}"
+    xdg-open "https://rentry.co/me-cli" 2>/dev/null || echo -e "${RED}❌ Cannot open browser automatically${END}"
+    echo -e "${GREEN}✅ Please copy the content manually${END}"
 }
 
 view_files() {
@@ -101,32 +149,56 @@ view_files() {
         return
     fi
     
-    echo -e "${YELLOW}📁 View Files...${END}"
+    echo -e "${ORANGE}${BOLD}"
+    echo "╔══════════════════════════════════════════════╗"
+    echo "║                 VIEW FILES                   ║"
+    echo "╚══════════════════════════════════════════════╝"
+    echo -e "${END}"
+    
+    echo -e "${ORANGE}📁 DOR Files Location:${END}"
+    echo -e "${CYAN}$(pwd)/me-cli/${END}"
+    echo
+    echo -e "${YELLOW}File List:${END}"
+    echo -e "${GREEN}══════════════════════════════════════════════${END}"
     ls -la me-cli/
+    echo -e "${GREEN}══════════════════════════════════════════════${END}"
+    echo -e "${BLUE}Total files: ${MAGENTA}$(find me-cli -type f | wc -l)${END}"
 }
 
 show_menu() {
     status=$(check_status)
     
     if [ "$status" = "active" ]; then
-        STATUS_DISPLAY="${GREEN}🟢 ACTIVE${END}"
+        STATUS_DISPLAY="${GREEN}${BOLD}🟢 ACTIVE${END}"
+        STATUS_BOX="${GREEN}"
     else
-        STATUS_DISPLAY="${RED}🔴 OFF${END}"
+        STATUS_DISPLAY="${RED}${BOLD}🔴 OFF${END}"
+        STATUS_BOX="${RED}"
     fi
     
-    echo -e "${CYAN}📋 MENU DOR DOR:${END}"
+    echo -e "${CYAN}${BOLD}"
+    echo "╔══════════════════════════════════════════════╗"
+    echo "║                   MAIN MENU                  ║"
+    echo "╚══════════════════════════════════════════════╝"
+    echo -e "${END}"
+    
+    echo -e "${STATUS_BOX}┌────────────────────────────────────────────┐${END}"
+    echo -e "${STATUS_BOX}│           ${BOLD}STATUS: $STATUS_DISPLAY${STATUS_BOX}           │${END}"
+    echo -e "${STATUS_BOX}└────────────────────────────────────────────┘${END}"
     echo
-    echo -e "Status: $STATUS_DISPLAY"
+    
+    echo -e "${PURPLE}${BOLD}Please select an option:${END}"
     echo
-    echo -e "1. 🚀 INSTALL DOR"
-    echo -e "2. 🚀 MENU V1"
-    echo -e "3. 🚀 MENU V2"
-    echo -e "4. ⚙️  SETUP ENVIRONMENT"
-    echo -e "5. 📋 COPY CONTENT"
-    echo -e "6. 📁 VIEW FILES"
-    echo -e "0. ❌ EXIT"
+    echo -e "  ${GREEN}${BOLD}1.${END} ${GREEN}🚀 INSTALL DOR${END}"
+    echo -e "  ${CYAN}${BOLD}2.${END} ${CYAN}🚀 MENU V1${END}"
+    echo -e "  ${BLUE}${BOLD}3.${END} ${BLUE}🚀 MENU V2${END}"
+    echo -e "  ${MAGENTA}${BOLD}4.${END} ${MAGENTA}⚙️  SETUP ENVIRONMENT${END}"
+    echo -e "  ${ORANGE}${BOLD}5.${END} ${ORANGE}📋 COPY CONTENT${END}"
+    echo -e "  ${YELLOW}${BOLD}6.${END} ${YELLOW}📁 VIEW FILES${END}"
+    echo -e "  ${RED}${BOLD}0.${END} ${RED}❌ EXIT${END}"
     echo
-    echo -n -e "${YELLOW}Select option (0-6): ${END}"
+    echo -e "${GREEN}══════════════════════════════════════════════${END}"
+    echo -n -e "${CYAN}${BOLD}Enter your choice (0-6): ${END}"
 }
 
 main() {
@@ -144,17 +216,27 @@ main() {
             5) copy_content ;;
             6) view_files ;;
             0) 
-                echo -e "${GREEN}👋 Goodbye!${END}"
-                exit 0 
+                echo
+                echo -e "${GREEN}${BOLD}"
+                echo "╔══════════════════════════════════════════════╗"
+                echo "║                 THANK YOU                    ║"
+                echo "║                 GOODBYE! 👋                  ║"
+                echo "╚══════════════════════════════════════════════╝"
+                echo -e "${END}"
+                menu 
                 ;;
-            *) menu ;;
+            *) 
+                echo
+                print_error "Invalid choice! Please select 0-6"
+                sleep 2 
+                ;;
         esac
         
         echo
-        echo -e "${YELLOW}Press Enter to continue...${END}"
+        echo -e "${YELLOW}${BOLD}Press Enter to continue...${END}"
         read
     done
 }
 
-trap 'echo -e "\n${RED}❌ Stopped${END}"; exit 1' INT
+trap 'echo -e "\n${RED}${BOLD}❌ Operation stopped by user${END}"; exit 1' INT
 main
