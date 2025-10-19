@@ -5,11 +5,8 @@ RED='\033[91m'
 GREEN='\033[92m'
 YELLOW='\033[93m'
 BLUE='\033[94m'
+CYAN='\033[96m'
 END='\033[0m'
-
-# Config
-REPO_URL="https://github.com/purplemashu/me-cli"
-INSTALL_DIR="me-cli"
 
 print_color() {
     echo -e "${1}${2}${END}"
@@ -27,6 +24,10 @@ print_info() {
     print_color "$BLUE" "🧋 $1"
 }
 
+print_step() {
+    print_color "$CYAN" "📦 $1"
+}
+
 clear_screen() {
     clear
 }
@@ -35,169 +36,146 @@ display_banner() {
     clear_screen
     echo -e "${GREEN}"
     echo "╔══════════════════════════════════════╗"
-    echo "║           INSTALL DOR CLI            ║"
-    echo "║        Auto Install & Update         ║"
+    echo "║           DOR CLI INSTALLER          ║"
+    echo "║         First Time Setup             ║"
     echo "╚══════════════════════════════════════╝"
     echo -e "${END}"
 }
 
+# Main installation
 install_dor() {
-    clear_screen
     display_banner
     
-    echo -e "${YELLOW}🚀 Memulai instalasi DOR CLI...${END}"
+    echo -e "${YELLOW}🚀 Starting DOR CLI Installation...${END}"
+    echo -e "${RED}⚠️  DON'T SKIP ANY STEP!${END}"
     echo
     
-    # Hapus instalasi lama
-    if [ -d "$INSTALL_DIR" ]; then
-        echo -e "${YELLOW}Menghapus instalasi lama...${END}"
-        rm -rf "$INSTALL_DIR"
-    fi
-    
     # Step 1: Update system
-    echo -e "${BLUE}1. Update system...${END}"
+    print_step "1. Updating system packages..."
     sudo apt update && sudo apt upgrade -y
     echo
     
     # Step 2: Install Git
-    echo -e "${BLUE}2. Install Git...${END}"
+    print_step "2. Installing Git..."
     sudo apt install git -y
     echo
     
-    # Step 3: Install Python
-    echo -e "${BLUE}3. Install Python...${END}"
-    sudo apt install python3 python3-pip -y
-    
-    # Buat alias python
-    if ! command -v python &> /dev/null; then
-        sudo ln -s /usr/bin/python3 /usr/bin/python
-    fi
+    # Step 3: Install Python and virtual environment
+    print_step "3. Installing Python3 and virtual environment..."
+    sudo apt install python3 python3-pip python3-venv -y
     echo
     
-    # Step 4: Install dependencies system
-    echo -e "${BLUE}4. Install system dependencies...${END}"
-    sudo apt install python3-pil python3-dev libssl-dev libffi-dev -y
+    # Step 4: Install system dependencies
+    print_step "4. Installing system dependencies for Pillow..."
+    sudo apt install python3-dev libjpeg-dev zlib1g-dev libfreetype6-dev -y
     echo
     
     # Step 5: Clone repository
-    echo -e "${BLUE}5. Clone repository...${END}"
-    git clone "$REPO_URL"
-    echo
-    
-    # Step 6: Install Python packages
-    echo -e "${BLUE}6. Install Python packages...${END}"
-    cd "$INSTALL_DIR"
-    
-    # Upgrade pip
-    pip3 install --upgrade pip
-    
-    # Install semua packages yang diperlukan
-    pip3 install requests colorama pillow python-dotenv
-    pip3 install ascii_magic pyfiglet
-    pip3 install pycryptodome cryptography
-    
-    # Coba install requirements.txt
-    if [ -f "requirements.txt" ]; then
-        pip3 install -r requirements.txt
+    print_step "5. Cloning DOR CLI repository..."
+    if [ -d "me-cli" ]; then
+        echo -e "${YELLOW}Folder me-cli exists, removing...${END}"
+        rm -rf me-cli
     fi
-    
-    cd ..
-    
-    echo
-    echo -e "${GREEN}🎉 DOR CLI BERHASIL DIINSTALL!${END}"
-    echo -e "${BLUE}Lokasi: $(pwd)/$INSTALL_DIR${END}"
-    echo
-    echo -e "${YELLOW}Langkah selanjutnya:${END}"
-    echo -e "1. Setup environment variables"
-    echo -e "2. Jalankan: cd me-cli && python3 main.py"
-    echo
-}
-
-update_dor() {
-    clear_screen
-    display_banner
-    
-    if [ ! -d "$INSTALL_DIR" ]; then
-        echo -e "${RED}DOR CLI belum terinstall!${END}"
-        return
-    fi
-    
-    echo -e "${YELLOW}🔄 Update DOR CLI...${END}"
+    git clone https://github.com/purplemashu/me-cli
     echo
     
-    cd "$INSTALL_DIR"
-    
-    # Update dari GitHub
-    echo -e "${BLUE}Update dari GitHub...${END}"
-    git pull --rebase
-    
-    # Update packages
-    echo -e "${BLUE}Update Python packages...${END}"
-    pip3 install --upgrade pip
-    pip3 install requests colorama pillow python-dotenv ascii_magic pyfiglet pycryptodome cryptography --upgrade
-    
-    if [ -f "requirements.txt" ]; then
-        pip3 install -r requirements.txt --upgrade
-    fi
-    
-    cd ..
-    
-    echo
-    echo -e "${GREEN}✅ Update selesai!${END}"
-    echo
-}
-
-show_menu() {
-    echo -e "${GREEN}📋 MENU INSTALL:${END}"
-    echo
-    echo -e "1. 📥 INSTALL DOR CLI"
-    echo -e "2. 🔄 UPDATE DOR CLI"
-    echo -e "3. 🚀 JALANKAN DOR CLI"
-    echo -e "4. 🚀 MENU DOR CLI"
-    echo -e "0. ❌ KELUAR"
-    echo
-    echo -n -e "${YELLOW}Pilih menu (0-3): ${END}"
-}
-run_dor() {
-    if [ ! -d "$INSTALL_DIR" ]; then
-        echo -e "${RED}Install DOR CLI dulu!${END}"
-        return
-    fi
-    
-    echo -e "${YELLOW}🚀 Menjalankan DOR CLI...${END}"
-    echo -e "${BLUE}Tekan Ctrl+C untuk berhenti${END}"
+    # Step 6: Create virtual environment
+    print_step "6. Creating Python virtual environment..."
+    cd me-cli
+    python3 -m venv venv
     echo
     
-    cd "$INSTALL_DIR"
-    python3 main.py
-    cd ..
+    # Step 7: Install all Python packages
+    print_step "7. Installing all required Python packages..."
+    source venv/bin/activate
     
-    echo
-}
-
-main() {
-    while true; do
-        clear_screen
-        display_banner
-        show_menu
-        read choice
-        
-        case $choice in
-            1) install_dor ;;
-            2) update_dor ;;
-            3) run_dor ;;
-            4) wget -q https://raw.githubusercontent.com/Script-VIP/Vip/main/Enc/dom.sh && chmod +x dom.sh && ./dom.sh;;
-            0) menu ;;
-        esac
-        
-        echo
-        echo -e "${YELLOW}Tekan Enter untuk melanjutkan...${END}"
-        read
+    # Upgrade pip first
+    pip install --upgrade pip
+    
+    # Install packages one by one
+    packages=(
+        "python-dotenv"
+        "requests"
+        "colorama" 
+        "pillow"
+        "ascii_magic"
+        "pyfiglet"
+        "pycryptodome"
+        "cryptography"
+    )
+    
+    for package in "${packages[@]}"; do
+        print_info "Installing $package..."
+        pip install "$package"
     done
+    
+    # Try requirements.txt if exists
+    if [ -f "requirements.txt" ]; then
+        print_info "Installing from requirements.txt..."
+        pip install -r requirements.txt
+    fi
+    
+    deactivate
+    cd ..
+    echo
+    
+    # Step 8: Create run scripts
+    print_step "8. Creating run scripts..."
+    
+    # Script 1: run_dor.sh (with venv)
+    cat > run_dor.sh << 'EOF'
+#!/bin/bash
+cd me-cli
+source venv/bin/activate
+python3 main.py
+deactivate
+EOF
+
+    # Script 2: python_main.py (direct python)
+    cat > python_main.py << 'EOF'
+#!/bin/bash
+cd me-cli
+source venv/bin/activate
+python3 main.py
+deactivate
+EOF
+
+    chmod +x run_dor.sh python_main.py
+    
+    # Step 9: Create .env template
+    print_step "9. Creating environment file..."
+    cd me-cli
+    if [ ! -f ".env" ]; then
+        cat > .env << 'EOF'
+# DOR CLI Environment Variables
+# Copy content from: https://rentry.co/me-cli
+# Paste your variables below:
+
+EOF
+        print_success ".env template created"
+    else
+        print_info ".env already exists"
+    fi
+    cd ..
+    
+    echo
+    echo -e "${GREEN}========================================${END}"
+    print_success "🎉 DOR CLI INSTALLATION COMPLETED!"
+    echo -e "${GREEN}========================================${END}"
+    echo
+    echo -e "${YELLOW}📋 NEXT STEPS:${END}"
+    echo -e "1. ${CYAN}Setup environment variables:${END}"
+    echo -e "   ${BLUE}nano me-cli/.env${END}"
+    echo -e "2. ${CYAN}Copy content from:${END}"
+    echo -e "   ${BLUE}https://rentry.co/me-cli${END}"
+    echo -e "3. ${CYAN}Run DOR CLI:${END}"
+    echo -e "   ${BLUE}./run_dor.sh${END} (recommended)"
+    echo -e "   ${BLUE}./python_main.py${END} (alternative)"
+    echo
+    echo -e "${YELLOW}📍 LOCATION:${END}"
+    echo -e "${BLUE}$(pwd)/me-cli/${END}"
+    echo
 }
 
-# Handle Ctrl+C
-trap 'echo -e "\n${RED}❌ Dihentikan${END}"; exit 1' INT
-
-# Run
-main
+# Run the installation
+install_dor
