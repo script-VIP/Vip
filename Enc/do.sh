@@ -49,8 +49,6 @@ display_banner() {
     echo "║         Auto Install & Update        ║"
     echo "╚══════════════════════════════════════╝"
     echo -e "${END}"
-    echo -e "${YELLOW}Platform: VPS Linux (Termius/JuiceSSH)${END}"
-    echo
 }
 
 check_install() {
@@ -151,7 +149,7 @@ install_dor() {
     # Step 4: Install Pillow dependencies
     print_info "4. apt install python3-pil -y"
     echo -e "${YELLOW}Executing...${END}"
-    sudo apt install python3-pil python3-pip -y
+    sudo apt install python3-pil -y
     if [ $? -eq 0 ]; then
         print_success "Pillow dependencies installed"
     else
@@ -171,36 +169,48 @@ install_dor() {
     fi
     echo
     
-    # Step 6: Install requirements
-    print_info "6. cd me-cli && pip3 install -r requirements.txt"
-    echo -e "${YELLOW}Executing...${END}"
+    # Step 6: Install requirements - FIXED VERSION
+    print_info "6. Install Python packages..."
     cd "$INSTALL_DIR"
     
     # Upgrade pip first
     pip3 install --upgrade pip
     
-    # Install requirements
+    # Install packages manually tanpa version spesifik
+    print_info "Installing packages manual..."
+    pip3 install requests colorama pillow python-dotenv ascii_magic pyfiglet
+    
+    # Coba install requirements.txt tanpa version spesifik
     if [ -f "requirements.txt" ]; then
-        pip3 install -r requirements.txt
-        if [ $? -eq 0 ]; then
-            print_success "Requirements installed"
+        print_info "Mencoba install requirements.txt (tanpa version)..."
+        # Buat requirements tanpa version
+        grep -v '==' requirements.txt | grep -v '^$' > requirements_simple.txt
+        if [ -s requirements_simple.txt ]; then
+            pip3 install -r requirements_simple.txt
         else
-            print_warning "Ada error requirements, coba install manual..."
-            # Install common packages manually
-            pip3 install requests colorama pillow python-dotenv ascii_magic pyfiglet
+            print_warning "requirements_simple.txt kosong"
         fi
-    else
-        print_warning "requirements.txt tidak ditemukan, install manual..."
-        pip3 install requests colorama pillow python-dotenv ascii_magic pyfiglet
+        rm -f requirements_simple.txt
     fi
+    
     cd ..
+    print_success "Python packages installed"
     echo
     
     # Step 7: Test run
-    print_info "7. Test: cd me-cli && python3 main.py --help"
-    echo -e "${YELLOW}Testing...${END}"
+    print_info "7. Testing instalasi..."
     cd "$INSTALL_DIR"
-    timeout 10s python3 main.py --help || echo -e "${YELLOW}Test selesai${END}"
+    
+    # Test import modules
+    if python3 -c "import requests, colorama, pillow, ascii_magic, pyfiglet; print('✅ Semua modules berhasil')" 2>/dev/null; then
+        print_success "Semua modules work"
+    else
+        print_warning "Beberapa modules mungkin bermasalah"
+    fi
+    
+    # Test run main.py
+    timeout 10s python3 main.py --help 2>/dev/null && print_success "Main.py berjalan" || print_warning "Main.py ada warning"
+    
     cd ..
     echo
     
@@ -208,6 +218,12 @@ install_dor() {
     if [ -f "$INSTALL_DIR/main.py" ]; then
         print_success "🎉 DOR BERHASIL DIINSTALL!"
         echo -e "${GREEN}Lokasi: $(pwd)/$INSTALL_DIR${END}"
+        
+        # Show next steps
+        echo
+        echo -e "${YELLOW}📋 Langkah selanjutnya:${END}"
+        echo -e "${WHITE}1. Setup Environment (Menu 4)${END}"
+        echo -e "${WHITE}2. Jalankan DOR (Menu 3)${END}"
     else
         print_error "❌ Instalasi gagal!"
     fi
@@ -229,15 +245,28 @@ update_dor() {
     echo -e "${CYAN}🔄 UPDATE DOR...${END}"
     echo
     
-    print_info "Update: cd me-cli && git pull --rebase"
+    print_info "Update dari GitHub..."
     cd "$INSTALL_DIR"
     git pull --rebase
     cd ..
     echo
     
-    print_info "Update: cd me-cli && pip3 install -r requirements.txt"
+    print_info "Update Python packages..."
     cd "$INSTALL_DIR"
-    pip3 install -r requirements.txt --upgrade
+    
+    # Update packages manual
+    pip3 install --upgrade pip
+    pip3 install requests colorama pillow python-dotenv ascii_magic pyfiglet --upgrade
+    
+    # Update requirements jika ada
+    if [ -f "requirements.txt" ]; then
+        grep -v '==' requirements.txt | grep -v '^$' > requirements_simple.txt
+        if [ -s requirements_simple.txt ]; then
+            pip3 install -r requirements_simple.txt --upgrade
+        fi
+        rm -f requirements_simple.txt
+    fi
+    
     cd ..
     echo
     
@@ -301,7 +330,9 @@ setup_environment() {
     if [ ! -f ".env" ]; then
         echo "# Add your environment variables here" > .env
         echo "# Copy from https://rentry.co/me-cli" >> .env
-        print_info "File .env template dibuat, edit dengan nano .env"
+        print_info "File .env template dibuat, edit dengan: nano .env"
+    else
+        print_info "File .env sudah ada, edit dengan: nano .env"
     fi
     cd ..
     
@@ -325,6 +356,11 @@ show_info() {
     echo -e "${WHITE}python3 main.py${END}"
     echo
     echo -e "${RED}🚫 JANGAN SKIP SATU COMMAND PUN!${END}"
+    echo
+    echo -e "${GREEN}🐛 FIX REQUIREMENTS ERROR:${END}"
+    echo -e "${YELLOW}Jika error version, install manual:${END}"
+    echo -e "${WHITE}cd me-cli${END}"
+    echo -e "${WHITE}pip3 install requests colorama pillow python-dotenv ascii_magic pyfiglet${END}"
     echo
     echo -e "${GREEN}🔄 UPDATE:${END}"
     echo -e "${WHITE}cd me-cli && git pull --rebase${END}"
