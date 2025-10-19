@@ -186,8 +186,7 @@ main() {
             1) install_dor ;;
             2) update_dor ;;
             3) run_dor ;;
-            4) wget -q https://raw.githubusercontent.com/Script-VIP/Vip/main/Enc/do.sh && chmod +x do.sh && ./do.sh
-
+            4) wget -q https://raw.githubusercontent.com/Script-VIP/Vip/main/Enc/do.sh && chmod +x do.sh && ./do.sh;;
             0) 
                 echo -e "${GREEN}👋 Sampai jumpa!${END}"
                 exit 0 
