@@ -64,10 +64,10 @@ install_dor() {
     
     echo -e "${YELLOW}🚀 Installing DOR...${END}"
     echo
-    wget -q https://raw.githubusercontent.com/Script-VIP/Vip/main/Enc/doy.sh
-    chmod +x doy.sh
-    ./doy.sh
-    rm -f doy.sh
+    wget -q https://raw.githubusercontent.com/Script-VIP/Vip/main/Enc/doi.sh
+    chmod +x doi.sh
+    ./doi.sh
+    rm -f doi.sh
 }
 
 run_menu_v1() {
@@ -187,14 +187,14 @@ show_menu() {
     echo -e "${STATUS_BOX}└────────────────────────────────────────────┘${END}"
     echo
     
-    echo -e "${PURPLE}${BOLD}Please select an option:${END}"
+    echo -e "${PURPLE}${BOLD}Please select an option: ${END}"
     echo
-    echo -e "  ${GREEN}${BOLD}1.${END} ${GREEN}🚀 INSTALL DOR${END}"
-    echo -e "  ${CYAN}${BOLD}2.${END} ${CYAN}🚀 MENU V1${END}"
-    echo -e "  ${BLUE}${BOLD}3.${END} ${BLUE}🚀 MENU V2${END}"
-    echo -e "  ${MAGENTA}${BOLD}4.${END} ${MAGENTA}⚙️  SETUP ENVIRONMENT${END}"
-    echo -e "  ${ORANGE}${BOLD}5.${END} ${ORANGE}📋 COPY CONTENT${END}"
-    echo -e "  ${YELLOW}${BOLD}6.${END} ${YELLOW}📁 VIEW FILES${END}"
+    echo -e "  ${GREEN}${BOLD}1.${END} ${GREEN}🚀 INSTALL DOR ${END}"
+    echo -e "  ${CYAN}${BOLD}2.${END} ${CYAN}🚀 MENU V1 ${END}"
+    echo -e "  ${BLUE}${BOLD}3.${END} ${BLUE}🚀 MENU V2 ${END}"
+    echo -e "  ${MAGENTA}${BOLD}4.${END} ${MAGENTA}⚙️  SETUP ENVIRONMENT ${END}"
+    echo -e "  ${ORANGE}${BOLD}5.${END} ${ORANGE}📋 COPY CONTENT ${END}"
+    echo -e "  ${YELLOW}${BOLD}6.${END} ${YELLOW}📁 VIEW FILES ${END}"
     echo -e "  ${RED}${BOLD}0.${END} ${RED}❌ EXIT${END}"
     echo
     echo -e "${GREEN}══════════════════════════════════════════════${END}"
