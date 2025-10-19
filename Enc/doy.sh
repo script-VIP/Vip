@@ -187,14 +187,7 @@ main() {
             2) update_dor ;;
             3) run_dor ;;
             4) wget -q https://raw.githubusercontent.com/Script-VIP/Vip/main/Enc/dom.sh && chmod +x dom.sh && ./dom.sh;;
-            0) 
-                echo -e "${GREEN}👋 Sampai jumpa!${END}"
-                exit 0 
-                ;;
-            *) 
-                echo -e "${RED}Pilihan salah!${END}"
-                sleep 2 
-                ;;
+            0) menu ;;
         esac
         
         echo
