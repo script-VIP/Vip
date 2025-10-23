@@ -162,6 +162,81 @@ test_installation() {
     return 0
 }
 
+# Create menu script
+create_menu() {
+    print_step "Creating menu scripts..."
+    
+    # Main run script
+    cat > run_dor.sh << 'EOF'
+#!/bin/bash
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR/me-cli"
+
+if [ -f "venv/bin/activate" ]; then
+    source venv/bin/activate
+    python3 main.py
+    deactivate
+else
+    echo "Error: Virtual environment not found!"
+    echo "Please make sure the installation completed successfully."
+    exit 1
+fi
+EOF
+
+    # Alternative script
+    cat > python_main.py << 'EOF'
+#!/bin/bash
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR/me-cli"
+
+if [ -f "venv/bin/activate" ]; then
+    source venv/bin/activate
+    python3 main.py
+    deactivate
+else
+    echo "Error: Virtual environment not found!"
+    echo "Please run the installer first!"
+    exit 1
+fi
+EOF
+
+    # Simple one-click script
+    cat > start_dor.sh << 'EOF'
+#!/bin/bash
+cd me-cli
+source venv/bin/activate
+python3 main.py
+deactivate
+EOF
+
+    # Make all executable
+    chmod +x run_dor.sh python_main.py start_dor.sh
+    print_success "Menu scripts created"
+}
+
+# Create desktop shortcut (optional)
+create_desktop_shortcut() {
+    if [ -d "$HOME/Desktop" ]; then
+        print_step "Creating desktop shortcut..."
+        
+        cat > "$HOME/Desktop/DOR_CLI.desktop" << EOF
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=DOR CLI
+Comment=DOR Command Line Interface
+Exec=$PWD/run_dor.sh
+Icon=utilities-terminal
+Terminal=true
+StartupNotify=false
+Categories=Utility;
+EOF
+        
+        chmod +x "$HOME/Desktop/DOR_CLI.desktop"
+        print_success "Desktop shortcut created"
+    fi
+}
+
 # Main installation
 install_dor() {
     display_banner
@@ -206,27 +281,8 @@ install_dor() {
     install_python_packages
     echo
     
-    # Step 6: Create run script
-    print_step "6. Creating run script..."
-    
-    cat > run_dor.sh << 'EOF'
-#!/bin/bash
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR/me-cli"
-
-if [ -f "venv/bin/activate" ]; then
-    source venv/bin/activate
-    python3 main.py
-    deactivate
-else
-    echo "Error: Virtual environment not found!"
-    echo "Please make sure the installation completed successfully."
-    exit 1
-fi
-EOF
-
-    chmod +x run_dor.sh
-    print_success "Run script created"
+    # Step 6: Create menu scripts
+    create_menu
     
     # Step 7: Create .env template
     print_step "7. Creating environment file..."
@@ -244,7 +300,10 @@ EOF
     fi
     cd ..
     
-    # Step 8: Test installation
+    # Step 8: Create desktop shortcut
+    create_desktop_shortcut
+    
+    # Step 9: Test installation
     print_step "8. Testing installation..."
     if test_installation; then
         print_success "Installation test passed"
@@ -264,17 +323,18 @@ EOF
     echo -e "   ${BLUE}nano me-cli/.env${END}"
     echo -e "2. ${CYAN}Copy content from:${END}"
     echo -e "   ${BLUE}https://rentry.co/me-cli${END}"
-    echo -e "3. ${CYAN}Run DOR CLI:${END}"
-    echo -e "   ${BLUE}./run_dor.sh${END}"
+    echo
+    echo -e "${YELLOW}🚀 LAUNCH OPTIONS:${END}"
+    echo -e "   ${GREEN}./run_dor.sh${END}        (Recommended)"
+    echo -e "   ${GREEN}./python_main.py${END}    (Alternative)" 
+    echo -e "   ${GREEN}./start_dor.sh${END}      (Simple)"
+    echo
+    if [ -f "$HOME/Desktop/DOR_CLI.desktop" ]; then
+        echo -e "   ${GREEN}Desktop Shortcut${END}   (Double-click)"
+    fi
     echo
     echo -e "${YELLOW}📍 LOCATION:${END}"
     echo -e "${BLUE}$(pwd)/me-cli/${END}"
-    echo
-    echo -e "${YELLOW}🛠️  TROUBLESHOOTING:${END}"
-    echo -e "If you see errors when running:"
-    echo -e "1. Check if .env is properly configured"
-    echo -e "2. Run: ${CYAN}cd me-cli && source venv/bin/activate && python3 main.py${END}"
-    echo -e "3. Reinstall with: ${CYAN}rm -rf me-cli && ./$(basename "$0")${END}"
     echo
 }
 
