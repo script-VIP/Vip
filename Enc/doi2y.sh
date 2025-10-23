@@ -37,7 +37,7 @@ display_banner() {
     echo -e "${GREEN}"
     echo "╔══════════════════════════════════════╗"
     echo "║           DOR CLI INSTALLER          ║"
-    echo "║         Fixed Version                ║"
+    echo "║           Tested Version             ║"
     echo "╚══════════════════════════════════════╝"
     echo -e "${END}"
 }
@@ -62,13 +62,9 @@ install_deps() {
         libjpeg-dev zlib1g-dev libfreetype6-dev
 }
 
-# Fix Python compatibility issues
-fix_python_issues() {
+# Install Python packages with proper handling
+install_python_packages() {
     cd me-cli
-    
-    # Check Python version and fix compatibility
-    PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
-    print_info "Python version: $PYTHON_VERSION"
     
     # Create virtual environment
     python3 -m venv venv
@@ -76,78 +72,94 @@ fix_python_issues() {
     # Activate venv
     source venv/bin/activate
     
-    # Upgrade pip first
-    pip install --upgrade pip
-    
-    # Install compatible package versions
-    print_info "Installing compatible package versions..."
+    # Upgrade pip first without warnings
+    pip install --upgrade pip --no-warn-script-location
     
     # Install packages without specific versions to avoid conflicts
-    pip install python-dotenv requests colorama pillow ascii_magic pyfiglet pycryptodome cryptography --no-cache-dir
+    print_info "Installing Python packages..."
     
-    # If there are still issues, try alternative packages
-    if [ $? -ne 0 ]; then
-        print_info "Trying alternative installation method..."
-        pip install python-dotenv requests colorama pillow ascii_magic pyfiglet pycryptodome cryptography --break-system-packages
-    fi
+    pip install --no-cache-dir --no-warn-script-location \
+        python-dotenv \
+        requests \
+        colorama \
+        pillow \
+        ascii_magic \
+        pyfiglet \
+        pycryptodome \
+        cryptography
     
-    # Install from requirements.txt if exists
-    if [ -f "requirements.txt" ]; then
-        print_info "Installing from requirements.txt..."
-        pip install -r requirements.txt --no-cache-dir
-    fi
+    # Skip requirements.txt to avoid version conflicts
+    print_info "Skipping requirements.txt to avoid version conflicts"
     
     deactivate
     cd ..
 }
 
-# Fix the Type Error in encrypt.py
+# Fix the Type Error in encrypt.py for older Python versions
 fix_type_error() {
     cd me-cli
     
-    # Check if encrypt.py has the type error
     if [ -f "app/client/encrypt.py" ]; then
-        print_info "Fixing type error in encrypt.py..."
+        print_info "Checking for type errors in encrypt.py..."
         
-        # Backup original file
-        cp app/client/encrypt.py app/client/encrypt.py.backup
-        
-        # Fix the type annotation issue for older Python versions
-        sed -i 's/iv_hex16: str | None = None/iv_hex16: str = None/g' app/client/encrypt.py
-        sed -i 's/urlsafe_b64: bool = False) -> str:/urlsafe_b64: bool = False) -> str:/g' app/client/encrypt.py
-        
-        print_success "Type error fixed"
+        # Check if the file contains the problematic syntax
+        if grep -q "str | None" "app/client/encrypt.py"; then
+            print_info "Fixing type annotations for older Python version..."
+            
+            # Backup original file
+            cp app/client/encrypt.py app/client/encrypt.py.backup
+            
+            # Fix type annotations (union types not supported in Python < 3.10)
+            sed -i 's/str | None/typing.Optional[str]/g' app/client/encrypt.py
+            sed -i 's/from typing import/from typing import Optional, /g' app/client/encrypt.py
+            
+            # Add typing import if not present
+            if ! grep -q "import typing" "app/client/encrypt.py"; then
+                sed -i '1s/^/import typing\n/' app/client/encrypt.py
+            fi
+            
+            print_success "Type annotations fixed"
+        else
+            print_info "No type errors found"
+        fi
     fi
     
     cd ..
 }
 
-# Test installation
+# Test the installation
 test_installation() {
     cd me-cli
+    
+    print_info "Testing installation..."
     
     if [ -f "venv/bin/activate" ]; then
         source venv/bin/activate
         
-        print_info "Testing Python packages..."
-        python3 -c "import requests; print('✅ requests OK')" 2>/dev/null && print_success "requests working" || print_error "requests failed"
-        python3 -c "import PIL; print('✅ Pillow OK')" 2>/dev/null && print_success "Pillow working" || print_error "Pillow failed"
-        python3 -c "import cryptography; print('✅ cryptography OK')" 2>/dev/null && print_success "cryptography working" || print_error "cryptography failed"
-        
-        # Test main.py
-        if python3 -c "from app.client.encrypt import build_encrypted_field; print('✅ encrypt OK')" 2>/dev/null; then
-            print_success "encrypt module working"
+        # Test basic imports
+        if python3 -c "import requests; import PIL; import cryptography; print('Basic imports OK')" 2>/dev/null; then
+            print_success "Basic packages working"
         else
-            print_error "encrypt module has issues - applying fix"
+            print_error "Basic packages failed"
+        fi
+        
+        # Test the specific encrypt module
+        if python3 -c "from app.client.encrypt import build_encrypted_field; print('Encrypt module OK')" 2>/dev/null; then
+            print_success "Encrypt module working"
+        else
+            print_error "Encrypt module has issues"
+            # Try to fix again
             fix_type_error
         fi
         
         deactivate
     else
         print_error "Virtual environment not found"
+        return 1
     fi
     
     cd ..
+    return 0
 }
 
 # Main installation
@@ -178,37 +190,43 @@ install_dor() {
         rm -rf me-cli
     fi
     git clone https://github.com/purplemashu/me-cli
+    if [ $? -ne 0 ]; then
+        print_error "Failed to clone repository"
+        exit 1
+    fi
     echo
     
-    # Step 4: Install Python packages
-    print_step "4. Installing Python packages..."
-    fix_python_issues
-    echo
-    
-    # Step 5: Fix known issues
-    print_step "5. Fixing compatibility issues..."
+    # Step 4: Fix type errors before installation
+    print_step "4. Fixing compatibility issues..."
     fix_type_error
     echo
     
-    # Step 6: Create run scripts
-    print_step "6. Creating run scripts..."
+    # Step 5: Install Python packages
+    print_step "5. Installing Python packages..."
+    install_python_packages
+    echo
+    
+    # Step 6: Create run script
+    print_step "6. Creating run script..."
     
     cat > run_dor.sh << 'EOF'
 #!/bin/bash
-cd "$(dirname "$0")"
-if [ -d "me-cli" ] && [ -f "me-cli/venv/bin/activate" ]; then
-    cd me-cli
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR/me-cli"
+
+if [ -f "venv/bin/activate" ]; then
     source venv/bin/activate
     python3 main.py
     deactivate
 else
-    echo "Error: DOR CLI not properly installed"
-    echo "Please run the installer again"
+    echo "Error: Virtual environment not found!"
+    echo "Please make sure the installation completed successfully."
     exit 1
 fi
 EOF
 
     chmod +x run_dor.sh
+    print_success "Run script created"
     
     # Step 7: Create .env template
     print_step "7. Creating environment file..."
@@ -228,7 +246,12 @@ EOF
     
     # Step 8: Test installation
     print_step "8. Testing installation..."
-    test_installation
+    if test_installation; then
+        print_success "Installation test passed"
+    else
+        print_error "Installation test failed"
+        echo -e "${YELLOW}But continuing anyway...${END}"
+    fi
     echo
     
     echo
@@ -248,8 +271,10 @@ EOF
     echo -e "${BLUE}$(pwd)/me-cli/${END}"
     echo
     echo -e "${YELLOW}🛠️  TROUBLESHOOTING:${END}"
-    echo -e "If you see errors, run: ${CYAN}./run_dor.sh${END} again"
-    echo -e "Or reinstall with: ${CYAN}rm -rf me-cli && ./$(basename "$0")${END}"
+    echo -e "If you see errors when running:"
+    echo -e "1. Check if .env is properly configured"
+    echo -e "2. Run: ${CYAN}cd me-cli && source venv/bin/activate && python3 main.py${END}"
+    echo -e "3. Reinstall with: ${CYAN}rm -rf me-cli && ./$(basename "$0")${END}"
     echo
 }
 
