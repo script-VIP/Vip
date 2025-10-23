@@ -41,7 +41,7 @@ display_banner() {
     echo -e "${PURPLE}${BOLD}"
     echo "╔══════════════════════════════════════════════╗"
     echo "║                  ${CYAN}MENU DOR DOR${PURPLE}                   ║"
-    echo "║               ${ORANGE}Multi Version${PURPLE}                   ║"
+    echo "║            ${ORANGE}Universal Ubuntu/Debian${PURPLE}            ║"
     echo "╚══════════════════════════════════════════════╝"
     echo -e "${END}"
     echo
@@ -55,39 +55,84 @@ check_status() {
     fi
 }
 
-# Fix Python type errors
-fix_python_errors() {
+# Fix ALL Python type errors for all versions
+fix_all_python_errors() {
     if [ -d "me-cli" ]; then
         cd me-cli
         
-        # Fix engsel.py
-        if [ -f "app/client/engsel.py" ]; then
-            if grep -q "bool | None" "app/client/engsel.py"; then
-                print_info "Fixing type errors in engsel.py..."
-                sed -i 's/bool | None/typing.Optional[bool]/g' app/client/engsel.py
-                sed -i 's/from typing import/from typing import Optional, /g' app/client/engsel.py
-                if ! grep -q "import typing" "app/client/engsel.py"; then
-                    sed -i '1s/^/import typing\n/' app/client/engsel.py
+        print_info "Scanning and fixing Python type errors..."
+        
+        # Find all Python files and fix Union types
+        find . -name "*.py" -type f | while read file; do
+            if grep -q ":[[:space:]]*[a-zA-Z_][a-zA-Z0-9_]*[[:space:]]*|[[:space:]]*None[[:space:]]*=" "$file"; then
+                print_info "Fixing: $file"
+                
+                # Fix patterns like: variable: type | None = None
+                sed -i 's/\(:[[:space:]]*\)\([a-zA-Z_][a-zA-Z0-9_]*\)\([[:space:]]*\)|\([[:space:]]*\)None\([[:space:]]*\)=/\1typing.Optional[\2]\5=/g' "$file"
+                
+                # Fix patterns like: variable: type | None
+                sed -i 's/\(:[[:space:]]*\)\([a-zA-Z_][a-zA-Z0-9_]*\)\([[:space:]]*\)|\([[:space:]]*\)None/\1typing.Optional[\2]/g' "$file"
+                
+                # Fix patterns like: -> type | None
+                sed -i 's/->\([[:space:]]*\)\([a-zA-Z_][a-zA-Z0-9_]*\)\([[:space:]]*\)|\([[:space:]]*\)None/->\1typing.Optional[\2]/g' "$file"
+                
+                # Add typing import if needed
+                if grep -q "typing.Optional" "$file" && ! grep -q "import typing" "$file" && ! grep -q "from typing import" "$file"; then
+                    sed -i '1s/^/import typing\n/' "$file"
+                fi
+                
+                # Add Optional to existing typing imports
+                if grep -q "from typing import" "$file" && ! grep -q "Optional" "$file"; then
+                    sed -i 's/from typing import/from typing import Optional, /g' "$file"
                 fi
             fi
-        fi
+        done
         
-        # Fix encrypt.py
-        if [ -f "app/client/encrypt.py" ]; then
-            if grep -q "str | None" "app/client/encrypt.py"; then
-                print_info "Fixing type errors in encrypt.py..."
-                sed -i 's/str | None/typing.Optional[str]/g' app/client/encrypt.py
-                sed -i 's/from typing import/from typing import Optional, /g' app/client/encrypt.py
-                if ! grep -q "import typing" "app/client/encrypt.py"; then
-                    sed -i '1s/^/import typing\n/' app/client/encrypt.py
-                fi
-            fi
-        fi
+        # Fix specific known problematic files
+        fix_specific_files
         
+        print_success "All Python type errors fixed!"
         cd ..
     fi
 }
 
+# Fix specific files that are known to have issues
+fix_specific_files() {
+    # Fix engsel.py
+    if [ -f "app/client/engsel.py" ]; then
+        print_info "Fixing engsel.py..."
+        
+        # Fix all Union types
+        sed -i 's/bool | None/typing.Optional[bool]/g' app/client/engsel.py
+        sed -i 's/str | None/typing.Optional[str]/g' app/client/engsel.py
+        sed -i 's/int | None/typing.Optional[int]/g' app/client/engsel.py
+        sed -i 's/list | None/typing.Optional[list]/g' app/client/engsel.py
+        sed -i 's/dict | None/typing.Optional[dict]/g' app/client/engsel.py
+        
+        # Ensure typing imports
+        if ! grep -q "import typing" app/client/engsel.py && ! grep -q "from typing import" app/client/engsel.py; then
+            sed -i '1s/^/import typing\n/' app/client/engsel.py
+        elif grep -q "from typing import" app/client/engsel.py && ! grep -q "Optional" app/client/engsel.py; then
+            sed -i 's/from typing import/from typing import Optional, /g' app/client/engsel.py
+        fi
+    fi
+    
+    # Fix encrypt.py
+    if [ -f "app/client/encrypt.py" ]; then
+        print_info "Fixing encrypt.py..."
+        
+        sed -i 's/str | None/typing.Optional[str]/g' app/client/encrypt.py
+        sed -i 's/bool | None/typing.Optional[bool]/g' app/client/encrypt.py
+        
+        if ! grep -q "import typing" app/client/encrypt.py && ! grep -q "from typing import" app/client/encrypt.py; then
+            sed -i '1s/^/import typing\n/' app/client/encrypt.py
+        elif grep -q "from typing import" app/client/encrypt.py && ! grep -q "Optional" app/client/encrypt.py; then
+            sed -i 's/from typing import/from typing import Optional, /g' app/client/encrypt.py
+        fi
+    fi
+}
+
+# Install DOR dengan fix otomatis
 install_dor() {
     echo -e "${ORANGE}${BOLD}"
     echo "╔══════════════════════════════════════════════╗"
@@ -97,23 +142,30 @@ install_dor() {
     
     echo -e "${YELLOW}🚀 Installing DOR...${END}"
     echo
+    
+    # Download installer
     wget -q https://raw.githubusercontent.com/Script-VIP/Vip/main/Enc/doi.sh
     chmod +x doi.sh
-    ./doi.sh
-    rm -f doi.sh
     
-    # Fix errors after installation
-    fix_python_errors
+    # Run installer
+    ./doi.sh
+    
+    # Fix errors setelah install
+    print_info "Applying compatibility fixes..."
+    fix_all_python_errors
+    
+    rm -f doi.sh
+    print_success "Installation completed with fixes!"
 }
 
 run_menu_v1() {
     if [ "$(check_status)" = "off" ]; then
         print_error "DOR not installed!"
-        return
+        return 1
     fi
     
-    # Fix errors before running
-    fix_python_errors
+    # Fix errors sebelum run
+    fix_all_python_errors
     
     echo -e "${GREEN}${BOLD}"
     echo "╔══════════════════════════════════════════════╗"
@@ -134,11 +186,11 @@ run_menu_v1() {
 run_menu_v2() {
     if [ "$(check_status)" = "off" ]; then
         print_error "DOR not installed!"
-        return
+        return 1
     fi
     
-    # Fix errors before running
-    fix_python_errors
+    # Fix errors sebelum run
+    fix_all_python_errors
     
     echo -e "${CYAN}${BOLD}"
     echo "╔══════════════════════════════════════════════╗"
@@ -149,13 +201,19 @@ run_menu_v2() {
     echo -e "${CYAN}🚀 Starting DOR V2...${END}"
     echo -e "${YELLOW}Press ${RED}Ctrl+C${YELLOW} to stop${END}"
     echo
-    ./run_dor.sh
+    
+    if [ -f "./run_dor.sh" ]; then
+        ./run_dor.sh
+    else
+        # Fallback ke V1
+        run_menu_v1
+    fi
 }
 
 setup_environment() {
     if [ "$(check_status)" = "off" ]; then
         print_error "DOR not installed!"
-        return
+        return 1
     fi
     
     echo -e "${MAGENTA}${BOLD}"
@@ -188,7 +246,7 @@ copy_content() {
 view_files() {
     if [ "$(check_status)" = "off" ]; then
         print_error "DOR not installed!"
-        return
+        return 1
     fi
     
     echo -e "${ORANGE}${BOLD}"
@@ -207,21 +265,43 @@ view_files() {
     echo -e "${BLUE}Total files: ${MAGENTA}$(find me-cli -type f | wc -l)${END}"
 }
 
-# Fix all errors function
-fix_all_errors() {
+# Test Python compatibility
+test_python_compatibility() {
     if [ "$(check_status)" = "off" ]; then
         print_error "DOR not installed!"
-        return
+        return 1
     fi
     
-    echo -e "${RED}${BOLD}"
+    echo -e "${BLUE}${BOLD}"
     echo "╔══════════════════════════════════════════════╗"
-    echo "║                FIX ERRORS                    ║"
+    echo "║              TEST COMPATIBILITY              ║"
     echo "╚══════════════════════════════════════════════╝"
     echo -e "${END}"
     
-    fix_python_errors
-    print_success "All Python type errors fixed!"
+    cd me-cli
+    source venv/bin/activate
+    
+    echo -e "${CYAN}Python Version:${END}"
+    python3 --version
+    
+    echo -e "${CYAN}Testing imports...${END}"
+    if python3 -c "
+import requests
+import PIL
+import cryptography
+from app.client.encrypt import build_encrypted_field
+from app.client.engsel import EngselClient
+print('✅ All imports successful')
+" 2>/dev/null; then
+        print_success "Compatibility test PASSED"
+    else
+        print_error "Compatibility test FAILED"
+        print_info "Running auto-fix..."
+        fix_all_python_errors
+    fi
+    
+    deactivate
+    cd ..
 }
 
 show_menu() {
@@ -235,6 +315,14 @@ show_menu() {
         STATUS_BOX="${RED}"
     fi
     
+    # Detect OS
+    if [ -f /etc/os-release ]; then
+        source /etc/os-release
+        OS_INFO="$PRETTY_NAME"
+    else
+        OS_INFO="Unknown Linux"
+    fi
+    
     echo -e "${CYAN}${BOLD}"
     echo "╔══════════════════════════════════════════════╗"
     echo "║                   MAIN MENU                  ║"
@@ -243,6 +331,7 @@ show_menu() {
     
     echo -e "${STATUS_BOX}┌────────────────────────────────────────────┐${END}"
     echo -e "${STATUS_BOX}│           ${BOLD}STATUS: $STATUS_DISPLAY${STATUS_BOX}           │${END}"
+    echo -e "${STATUS_BOX}│           ${BOLD}OS: $OS_INFO${STATUS_BOX}     │${END}"
     echo -e "${STATUS_BOX}└────────────────────────────────────────────┘${END}"
     echo
     
@@ -255,10 +344,11 @@ show_menu() {
     echo -e "  ${ORANGE}${BOLD}5.${END} ${ORANGE}📋 COPY CONTENT ${END}"
     echo -e "  ${YELLOW}${BOLD}6.${END} ${YELLOW}📁 VIEW FILES ${END}"
     echo -e "  ${RED}${BOLD}7.${END} ${RED}🔧 FIX ERRORS ${END}"
+    echo -e "  ${BLUE}${BOLD}8.${END} ${BLUE}🧪 TEST COMPATIBILITY ${END}"
     echo -e "  ${RED}${BOLD}0.${END} ${RED}❌ EXIT${END}"
     echo
     echo -e "${GREEN}══════════════════════════════════════════════${END}"
-    echo -n -e "${CYAN}${BOLD}Enter your choice (0-7): ${END}"
+    echo -n -e "${CYAN}${BOLD}Enter your choice (0-8): ${END}"
 }
 
 main() {
@@ -275,7 +365,8 @@ main() {
             4) setup_environment ;;
             5) copy_content ;;
             6) view_files ;;
-            7) fix_all_errors ;;
+            7) fix_all_python_errors ;;
+            8) test_python_compatibility ;;
             0) 
                 echo
                 echo -e "${GREEN}${BOLD}"
@@ -288,7 +379,7 @@ main() {
                 ;;
             *) 
                 echo
-                print_error "Invalid choice! Please select 0-7"
+                print_error "Invalid choice! Please select 0-8"
                 sleep 2 
                 ;;
         esac
