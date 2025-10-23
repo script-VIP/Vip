@@ -37,7 +37,7 @@ display_banner() {
     echo -e "${GREEN}"
     echo "╔══════════════════════════════════════╗"
     echo "║           DOR CLI INSTALLER          ║"
-    echo "║         Universal Setup              ║"
+    echo "║         Fixed Version                ║"
     echo "╚══════════════════════════════════════╝"
     echo -e "${END}"
 }
@@ -45,47 +45,109 @@ display_banner() {
 # Check if sudo is needed
 check_sudo() {
     if [ "$EUID" -eq 0 ]; then
-        # Running as root, no sudo needed
         SUDO_CMD=""
         print_info "Running as root user"
     else
-        # Not root, use sudo
         SUDO_CMD="sudo"
         print_info "Running as normal user (using sudo)"
     fi
-}
-
-# Detect and setup Python
-setup_python() {
-    # Try to detect available Python versions
-    if command -v python3.12 &> /dev/null; then
-        PYTHON_CMD="python3.12"
-    elif command -v python3.11 &> /dev/null; then
-        PYTHON_CMD="python3.11"
-    elif command -v python3.10 &> /dev/null; then
-        PYTHON_CMD="python3.10"
-    elif command -v python3.9 &> /dev/null; then
-        PYTHON_CMD="python3.9"
-    elif command -v python3.8 &> /dev/null; then
-        PYTHON_CMD="python3.8"
-    else
-        PYTHON_CMD="python3"
-    fi
-    
-    print_info "Using $PYTHON_CMD for installation"
-    echo "$PYTHON_CMD"
 }
 
 # Install dependencies
 install_deps() {
     print_step "Installing system dependencies..."
     
-    # Update package list
     $SUDO_CMD apt update
-    
-    # Install packages
     $SUDO_CMD apt install -y git python3 python3-pip python3-venv python3-dev \
         libjpeg-dev zlib1g-dev libfreetype6-dev
+}
+
+# Fix Python compatibility issues
+fix_python_issues() {
+    cd me-cli
+    
+    # Check Python version and fix compatibility
+    PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+    print_info "Python version: $PYTHON_VERSION"
+    
+    # Create virtual environment
+    python3 -m venv venv
+    
+    # Activate venv
+    source venv/bin/activate
+    
+    # Upgrade pip first
+    pip install --upgrade pip
+    
+    # Install compatible package versions
+    print_info "Installing compatible package versions..."
+    
+    # Install packages without specific versions to avoid conflicts
+    pip install python-dotenv requests colorama pillow ascii_magic pyfiglet pycryptodome cryptography --no-cache-dir
+    
+    # If there are still issues, try alternative packages
+    if [ $? -ne 0 ]; then
+        print_info "Trying alternative installation method..."
+        pip install python-dotenv requests colorama pillow ascii_magic pyfiglet pycryptodome cryptography --break-system-packages
+    fi
+    
+    # Install from requirements.txt if exists
+    if [ -f "requirements.txt" ]; then
+        print_info "Installing from requirements.txt..."
+        pip install -r requirements.txt --no-cache-dir
+    fi
+    
+    deactivate
+    cd ..
+}
+
+# Fix the Type Error in encrypt.py
+fix_type_error() {
+    cd me-cli
+    
+    # Check if encrypt.py has the type error
+    if [ -f "app/client/encrypt.py" ]; then
+        print_info "Fixing type error in encrypt.py..."
+        
+        # Backup original file
+        cp app/client/encrypt.py app/client/encrypt.py.backup
+        
+        # Fix the type annotation issue for older Python versions
+        sed -i 's/iv_hex16: str | None = None/iv_hex16: str = None/g' app/client/encrypt.py
+        sed -i 's/urlsafe_b64: bool = False) -> str:/urlsafe_b64: bool = False) -> str:/g' app/client/encrypt.py
+        
+        print_success "Type error fixed"
+    fi
+    
+    cd ..
+}
+
+# Test installation
+test_installation() {
+    cd me-cli
+    
+    if [ -f "venv/bin/activate" ]; then
+        source venv/bin/activate
+        
+        print_info "Testing Python packages..."
+        python3 -c "import requests; print('✅ requests OK')" 2>/dev/null && print_success "requests working" || print_error "requests failed"
+        python3 -c "import PIL; print('✅ Pillow OK')" 2>/dev/null && print_success "Pillow working" || print_error "Pillow failed"
+        python3 -c "import cryptography; print('✅ cryptography OK')" 2>/dev/null && print_success "cryptography working" || print_error "cryptography failed"
+        
+        # Test main.py
+        if python3 -c "from app.client.encrypt import build_encrypted_field; print('✅ encrypt OK')" 2>/dev/null; then
+            print_success "encrypt module working"
+        else
+            print_error "encrypt module has issues - applying fix"
+            fix_type_error
+        fi
+        
+        deactivate
+    else
+        print_error "Virtual environment not found"
+    fi
+    
+    cd ..
 }
 
 # Main installation
@@ -98,9 +160,6 @@ install_dor() {
     
     # Check sudo requirements
     check_sudo
-    
-    # Setup Python version
-    PYTHON_CMD=$(setup_python)
     
     # Step 1: Update system
     print_step "1. Updating system packages..."
@@ -121,56 +180,32 @@ install_dor() {
     git clone https://github.com/purplemashu/me-cli
     echo
     
-    # Step 4: Create virtual environment
-    print_step "4. Creating Python virtual environment..."
-    cd me-cli
-    $PYTHON_CMD -m venv venv
+    # Step 4: Install Python packages
+    print_step "4. Installing Python packages..."
+    fix_python_issues
     echo
     
-    # Step 5: Install Python packages
-    print_step "5. Installing Python packages..."
-    source venv/bin/activate
-    
-    # Upgrade pip first
-    pip install --upgrade pip
-    
-    # Install packages
-    packages=(
-        "python-dotenv"
-        "requests"
-        "colorama" 
-        "pillow"
-        "ascii_magic"
-        "pyfiglet"
-        "pycryptodome"
-        "cryptography"
-    )
-    
-    for package in "${packages[@]}"; do
-        print_info "Installing $package..."
-        pip install "$package"
-    done
-    
-    # Try requirements.txt if exists
-    if [ -f "requirements.txt" ]; then
-        print_info "Installing from requirements.txt..."
-        pip install -r requirements.txt
-    fi
-    
-    deactivate
-    cd ..
+    # Step 5: Fix known issues
+    print_step "5. Fixing compatibility issues..."
+    fix_type_error
     echo
     
     # Step 6: Create run scripts
     print_step "6. Creating run scripts..."
     
-    # Main run script
     cat > run_dor.sh << 'EOF'
 #!/bin/bash
-cd me-cli
-source venv/bin/activate
-python3 main.py
-deactivate
+cd "$(dirname "$0")"
+if [ -d "me-cli" ] && [ -f "me-cli/venv/bin/activate" ]; then
+    cd me-cli
+    source venv/bin/activate
+    python3 main.py
+    deactivate
+else
+    echo "Error: DOR CLI not properly installed"
+    echo "Please run the installer again"
+    exit 1
+fi
 EOF
 
     chmod +x run_dor.sh
@@ -191,6 +226,11 @@ EOF
     fi
     cd ..
     
+    # Step 8: Test installation
+    print_step "8. Testing installation..."
+    test_installation
+    echo
+    
     echo
     echo -e "${GREEN}========================================${END}"
     print_success "🎉 DOR CLI INSTALLATION COMPLETED!"
@@ -207,12 +247,9 @@ EOF
     echo -e "${YELLOW}📍 LOCATION:${END}"
     echo -e "${BLUE}$(pwd)/me-cli/${END}"
     echo
-    echo -e "${YELLOW}👤 PRIVILEGES:${END}"
-    if [ "$EUID" -eq 0 ]; then
-        echo -e "Running as: ${RED}Root user${END}"
-    else
-        echo -e "Running as: ${GREEN}Normal user${END}"
-    fi
+    echo -e "${YELLOW}🛠️  TROUBLESHOOTING:${END}"
+    echo -e "If you see errors, run: ${CYAN}./run_dor.sh${END} again"
+    echo -e "Or reinstall with: ${CYAN}rm -rf me-cli && ./$(basename "$0")${END}"
     echo
 }
 
