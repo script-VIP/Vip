@@ -1,40 +1,35 @@
 #!/bin/bash
+# Backup config lama
+cp /etc/haproxy/haproxy.cfg /etc/haproxy/haproxy.cfg.backup
 
-# Colors
-RED='\033[91m'
-GREEN='\033[92m'
-YELLOW='\033[93m'
-BLUE='\033[94m'
-CYAN='\033[96m'
-MAGENTA='\033[95m'
-ORANGE='\033[38;5;208m'
-PURPLE='\033[38;5;165m'
-BOLD='\033[1m'
-END='\033[0m'
+# Download config yang diperbaiki
+cat > /etc/haproxy/haproxy.cfg << EOF
+global
+    daemon
+    maxconn 256
+    user haproxy
+    group haproxy
 
-print_color() {
-    echo -e "${1}${2}${END}"
-}
+defaults
+    mode tcp
+    timeout connect 5000ms
+    timeout client 50000ms
+    timeout server 50000ms
 
-print_success() {
-    print_color "$GREEN" "✅ $1"
-}
+frontend ssh-ssl
+    bind *:443 ssl crt /etc/haproxy/hap.pem
+    default_backend nginx-https
 
-print_error() {
-    print_color "$RED" "❌ $1"
-}
+backend nginx-https
+    server nginx-https 127.0.0.1:8443
 
-print_warning() {
-    print_color "$YELLOW" "⚠️  $1"
-}
+frontend ssh-tcp
+    bind *:80
+    default_backend nginx-http
 
-print_info() {
-    print_color "$CYAN" "🧋 $1"
-}
-
-clear_screen() {
-    clear
-}
+backend nginx-http  
+    server nginx-http 127.0.0.1:8181
+EOF}
 
 display_banner() {
     clear_screen
