@@ -2,10 +2,10 @@
 <pre><code>apt update -y && apt install -y wget curl jq at screen && wget -q https://raw.githubusercontent.com/script-VIP/Vip/main/setup.sh && chmod +x setup.sh && screen -S install ./setup.sh
 </code></pre>
 
-### PERINTAH UPDATE 
+### PERINTAH UPDATE
 <pre><code>wget -q https://raw.githubusercontent.com/script-VIP/Vip/main/update.sh && chmod +x update.sh && ./update.sh</code></pre>
-### PERINTAH UPDATE 2 
-<pre><code>wget -q https://raw.githubusercontent.com/script-VIP/vip/main/upi.sh && chmod +x upi.sh && ./upi.sh</code></pre>
+### lanjutan instal (jika eror) 
+<pre><code>screen -r -d install</code></pre>
 
 ### FITUR TAMBAHAN
 - Tambah Swap 1GiB
