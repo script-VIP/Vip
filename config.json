@@ -1,0 +1,122 @@
+{
+  "log": {
+    "loglevel": "warning",
+    "access": "/var/log/v2ray/access.log",
+    "error": "/var/log/v2ray/error.log"
+  },
+  "inbounds": [
+    {
+      "port": 6000,
+      "protocol": "vmess",
+      "tag": "udp-dekodemo-vmess",
+      "settings": {
+        "clients": []
+      },
+      "streamSettings": {
+        "network": "udp",
+        "security": "none",
+        "udpSettings": {
+          "header": {
+            "type": "none"
+          }
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls"]
+      }
+    },
+    {
+      "port": 6001,
+      "protocol": "vless",
+      "tag": "udp-dekodemo-vless",
+      "settings": {
+        "clients": [],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "udp",
+        "security": "none"
+      }
+    },
+    {
+      "port": 6002,
+      "protocol": "trojan",
+      "tag": "udp-dekodemo-trojan",
+      "settings": {
+        "clients": []
+      },
+      "streamSettings": {
+        "network": "udp",
+        "security": "none"
+      }
+    },
+    {
+      "port": 6003,
+      "protocol": "shadowsocks",
+      "tag": "udp-dekodemo-ss",
+      "settings": {
+        "method": "2022-blake3-aes-128-gcm",
+        "password": "",
+        "network": "udp"
+      }
+    },
+    {
+      "port": 6004,
+      "protocol": "vmess",
+      "tag": "udp-dekodemo-vmess-ws",
+      "settings": {
+        "clients": []
+      },
+      "streamSettings": {
+        "network": "ws",
+        "security": "none",
+        "wsSettings": {
+          "path": "/udp"
+        }
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "protocol": "freedom",
+      "tag": "direct",
+      "settings": {}
+    },
+    {
+      "protocol": "blackhole",
+      "tag": "blocked",
+      "settings": {}
+    }
+  ],
+  "routing": {
+    "domainStrategy": "IPIfNonMatch",
+    "rules": [
+      {
+        "type": "field",
+        "ip": ["geoip:private"],
+        "outboundTag": "blocked"
+      },
+      {
+        "type": "field",
+        "domain": ["geosite:category-ads-all"],
+        "outboundTag": "blocked"
+      },
+      {
+        "type": "field",
+        "domain": ["geosite:cn"],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "policy": {
+    "levels": {
+      "0": {
+        "handshake": 4,
+        "connIdle": 300,
+        "uplinkOnly": 2,
+        "downlinkOnly": 5
+      }
+    }
+  }
+}
