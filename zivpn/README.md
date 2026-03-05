@@ -1,4 +1,4 @@
-```markdown
+
 # 🚀 VIP Script Collection
 
 Kumpulan script premium untuk berbagai keperluan VPS.
