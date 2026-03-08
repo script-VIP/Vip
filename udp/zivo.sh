@@ -816,10 +816,7 @@ add_user() {
         return
     fi
 
-    echo -e "${WHITE}Expired (masukkan angka hari) :${NC}"
-    echo -e "  ${CYAN}Contoh: 30 untuk 30 hari, 0 untuk Unlimited${NC}"
-    echo ""
-    read -rp "$(echo -e "${WHITE}Jumlah hari (0 = unlimited) : ${NC}")" days
+    read -rp "$(echo -e "${WHITE}Expired : ${NC}")" days
     
     if ! [[ "$days" =~ ^[0-9]+$ ]]; then
         echo -e "${RED}[!] Masukkan angka yang valid!${NC}"
@@ -837,26 +834,51 @@ add_user() {
     update_config_json
 
     echo ""
-    echo -e "${WHITE}══════════════════════════════════════════${NC}"
-    echo -e "${GREEN}  ✓ User berhasil ditambahkan!${NC}"
-    echo -e "${WHITE}══════════════════════════════════════════${NC}"
-    if [[ "$expiry" == "unlimited" ]]; then
-        echo -e "  Expired  : ${GREEN}Unlimited${NC}"
-    else
-        echo -e "  Expired  : ${YELLOW}$expiry${NC} (${days} hari)"
-    fi
-    echo -e "${WHITE}──────────────────────────────────────────${NC}"
-    echo -e "${YELLOW}  Cara connect di ZIVPN App (UDP Tunnel):${NC}"
-    if [[ -n "$DOMAIN" ]]; then
-        echo -e "  UDP Server  : ${CYAN}$DOMAIN${NC}"
-    else
-        echo -e "  ${RED}Domain belum diset! Set dulu via menu 13${NC}"
-        echo -e "  IP Sementara: ${CYAN}$(get_ip)${NC}"
-    fi
-    echo -e "  UDP Password: ${CYAN}$password${NC}"
-    echo -e "${WHITE}══════════════════════════════════════════${NC}"
-    echo ""
-    press_enter
+echo -e "${WHITE}═════════════════${NC}"
+echo -e "${GREEN}  ✓ Terima kasih sudah order kak😁${NC}"
+echo -e "${WHITE}═════════════════${NC}"
+echo -e "  ${CYAN}ZIVPN UDP${NC}"
+echo -e "${WHITE}═════════════════${NC}"
+
+# Informasi Server dan User
+if [[ -n "$DOMAIN" ]]; then
+    echo -e "  Domain      : ${CYAN}$DOMAIN${NC}"
+else
+    echo -e "  Domain      : ${RED}Belum diatur${NC}"
+    echo -e "  IP Server   : ${CYAN}$(get_ip)${NC}"
+fi
+echo -e "  Password    : ${YELLOW}$password${NC}"
+echo -e "  ISP Server  : ${CYAN}$(get_isp)${NC}"
+echo -e "  Lokasi      : ${CYAN}$(get_city)${NC}"
+echo -e "  ${WHITE}────────────────${NC}"
+echo -e "  Tanggal Buat: ${GREEN}$(date +"%Y-%m-%d")${NC}"
+
+if [[ "$expiry" == "unlimited" ]]; then
+    echo -e "  Tanggal Exp : ${GREEN}Unlimited${NC}"
+    echo -e "  Masa Aktif  : ${GREEN}Selamanya${NC}"
+else
+    echo -e "  Tanggal Exp : ${YELLOW}$expiry${NC}"
+    echo -e "  Masa Aktif  : ${YELLOW}${days} hari${NC}"
+fi
+
+echo -e "${WHITE}────────────────${NC}"
+echo -e "  ${YELLOW}Tutorial ZIVPN APP / UDP Tunnel${NC}"
+echo -e "${WHITE}────────────────${NC}"
+echo -e "  1. Buka ZIVPN App"
+echo -e "  2. Centang Udp"
+echo -e "  3. Klik Garis tiga ( dipojok kiri atas )"
+echo -e "  4. Klik Udp tunnel setting"
+
+if [[ -n "$DOMAIN" ]]; then
+    echo -e "  5. UDP Server  : ${CYAN}$DOMAIN${NC}"
+else
+    echo -e "  5. UDP Server  : ${CYAN}$(get_ip)${NC}"
+fi
+echo -e "     UDP Password: ${CYAN}$password${NC}"
+echo -e "  6. Klik APPLY → START"
+echo -e "${WHITE}═════════════════${NC}"
+echo ""
+press_enter
 }
 
 # === HAPUS USER ===
@@ -1080,7 +1102,7 @@ update_script() {
     echo ""
 
     # Ganti URL ini dengan URL raw script GitHub kamu nanti
-    local SCRIPT_URL="https://raw.githubusercontent.com/script-VIP/Vip/main/udp/ziiiv.sh"
+    local SCRIPT_URL="https://raw.githubusercontent.com/script-VIP/Vip/main/udp/zivo.sh"
     local SCRIPT_PATH=$(realpath "$0")
 
     echo -e "  Mengecek update dari GitHub..."
