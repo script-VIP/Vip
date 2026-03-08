@@ -1144,7 +1144,7 @@ main_menu() {
 
 backup_menu() {
     while true; do
-        banner
+        
         echo -e "${BOLD}${YELLOW}[ MENU BACKUP & RESTORE ]${NC}"
         echo ""
         echo -e "  ${GREEN}1${NC}. Backup Manual (Kirim ke Telegram)"
