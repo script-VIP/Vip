@@ -1174,5 +1174,4 @@ if [[ "$1" == "--backup" ]]; then
     exit 0
 fi
 
-check_root
 main_menu
