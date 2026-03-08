@@ -1120,7 +1120,7 @@ main_menu() {
             echo -e "  ${RED}11${NC}. Uninstall ZIVPN"
             echo ""
             echo -e "${WHITE}  ────────────────────────────────────────${NC}"
-            read -rp "  ${WHITE}Pilih menu [1-11] : ${NC}")" choice
+            read -p "${WHITE}Pilih menu [1-11] : ${NC}" choice
 
             case $choice in
                 1) add_user ;;
