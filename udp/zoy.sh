@@ -4,18 +4,6 @@
 #   By: Custom Script (based on ZIVPN official binary)
 #   OS: Ubuntu 20.04 / 22.04 / 24.04
 # =============================================
-# Hitung tanggal expired
-expi=$(date -d "+$days days" +"%Y-%m-%d")
-tgl=$(date -d "+$days days" +"%d")
-bln=$(date -d "+$days days" +"%b")
-thn=$(date -d "+$days days" +"%Y")
-expe="$tgl $bln, $thn"
-
-# Tanggal hari ini
-tgl2=$(date +"%d")
-bln2=$(date +"%b")
-thn2=$(date +"%Y")
-tnggl="$tgl2 $bln2, $thn2" 
 # === WARNA ===
 RED='\033[0;31m'
 GREEN='\033[0;32m'
