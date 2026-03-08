@@ -1088,6 +1088,7 @@ main_menu() {
             esac
         fi
     done
+    clear 
 }
 
 # === BACKUP MENU ===
