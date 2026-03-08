@@ -1,4 +1,4 @@
-#!/bin/bash
+!/bin/bash
 # =============================================
 #   INSTALL ZIVPN UDP MANAGER
 #   By: Custom Script
