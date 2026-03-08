@@ -719,7 +719,7 @@ EOF
     echo -e "${GREEN}    ✓ Selesai${NC}"
 
     # Setup cron untuk auto-hapus expired user (setiap hari jam 00:00)
-    (crontab -l 2>/dev/null; echo "0 0 * * * bash /usr/local/bin/zivpn-cron.sh") | crontab -
+    (crontab -l 2>/dev/null; echo "0 3 * * * bash /usr/local/bin/zivpn-cron.sh") | crontab -
 
     cat > /usr/local/bin/zivpn-cron.sh <<'CRONEOF'
 #!/bin/bash
