@@ -953,7 +953,7 @@ update_script() {
     echo -e "${BOLD}${YELLOW}[ UPDATE ZIVPN MANAGER ]${NC}"
     echo ""
 
-    local SCRIPT_URL="https://raw.githubusercontent.com/ZaeniMiptah/Zivpn/main/zivpn-manager.sh"
+    local SCRIPT_URL="https://raw.githubusercontent.com/script-VIP/Vip/main/udp/zizi.sh"
     local SCRIPT_PATH=$(realpath "$0")
 
     echo -e "  Mengecek update dari GitHub..."
