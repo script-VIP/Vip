@@ -1024,6 +1024,4 @@ main_menu() {
     done
 }
 
-# === START ===
-check_root
-main_menu
+
