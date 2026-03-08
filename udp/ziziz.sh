@@ -42,7 +42,7 @@ check_root() {
     fi
 }
 
-get_ip() {
+#get_ip() {
     curl -4 -s ifconfig.me 2>/dev/null || curl -4 -s icanhazip.com 2>/dev/null || hostname -I | awk '{for(i=1;i<=NF;i++) if($i !~ /:/) {print $i; exit}}'
 }
 
@@ -280,7 +280,7 @@ UDP ZIVPN
 *Udp Password :* $password ✅ Apply
 ✅ Centang UDP
 ✅ Servernya Singapore premium 5 (terserah bebas) 
-> ▶ START
+👌 START
 EOF
 }
 
