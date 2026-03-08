@@ -142,8 +142,8 @@ banner() {
         echo -e "  ${WHITE}RAM      :${NC} $ram"
         echo -e "  ${WHITE}CPU      :${NC} ${YELLOW}$cpu${NC}"
         echo -e "  ${WHITE}OS       :${NC} ${YELLOW}$os${NC}"
-        echo -e "  ${WHITE}Kernel   :${NC} ${YELLOW}$kernel${NC}"
-        echo -e "  ${WHITE}Uptime   :${NC} ${YELLOW}$uptime${NC}"
+        #echo -e "  ${WHITE}Kernel   :${NC} ${YELLOW}$kernel${NC}"
+        #echo -e "  ${WHITE}Uptime   :${NC} ${YELLOW}$uptime${NC}"
         echo -e "  ${WHITE}Port     :${NC} ${CYAN}5667 / 6000-19999 (UDP)${NC}"
     fi
     echo -e "${WHITE}  ════════════════════════════════════════${NC}"
@@ -889,6 +889,7 @@ echo -e "     UDP Password: ${CYAN}$password${NC}"
 echo -e "  6. Klik APPLY → START"
 echo -e "${WHITE}═════════════════${NC}"
 echo ""
+press_enter
 }
 
 # === HAPUS USER ===
@@ -1112,7 +1113,7 @@ update_script() {
     echo ""
 
     # Ganti URL ini dengan URL raw script GitHub kamu nanti
-    local SCRIPT_URL="https://raw.githubusercontent.com/script-VIP/Vip/main/udp/z.sh"
+    local SCRIPT_URL="https://raw.githubusercontent.com/script-VIP/Vip/main/udp/zo.sh"
     local SCRIPT_PATH=$(realpath "$0")
 
     echo -e "  Mengecek update dari GitHub..."
