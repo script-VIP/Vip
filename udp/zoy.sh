@@ -814,20 +814,29 @@ add_user() {
     load_users
     init_backup_config
 
-    read -rp "$(echo -e "${WHITE}Password    : ${NC}")" password
-    if [[ -z "$password" ]]; then
-        echo -e "${RED}[!] Password tidak boleh kosong!${NC}"
+    read -rp "$(echo -e "${WHITE}Username/Password : ${NC}")" base_password
+    if [[ -z "$base_password" ]]; then
+        echo -e "${RED}[!] Nama/katakunci tidak boleh kosong!${NC}"
         press_enter
         return
     fi
 
+    # Generate 3 digit angka random
+    random_num=$((RANDOM % 900 + 100))  # Menghasilkan angka 100-999
+    password="${base_password}${random_num}"
+
+    # Cek apakah password sudah digunakan
     if user_exists "$password"; then
-        echo -e "${RED}[!] Password '$password' sudah digunakan!${NC}"
-        press_enter
-        return
+        echo -e "${YELLOW}[!] Password '$password' sudah digunakan, generate ulang...${NC}"
+        # Generate ulang sampai dapat yang unik
+        while user_exists "$password"; do
+            random_num=$((RANDOM % 900 + 100))
+            password="${base_password}${random_num}"
+        done
+        echo -e "${GREEN}    ✓ Password baru: $password${NC}"
     fi
 
-    read -rp "$(echo -e "${WHITE}Expired : ${NC}")" days
+    read -rp "$(echo -e "${WHITE}Expired (hari)    : ${NC}")" days
     
     if ! [[ "$days" =~ ^[0-9]+$ ]]; then
         echo -e "${RED}[!] Masukkan angka yang valid!${NC}"
@@ -835,61 +844,74 @@ add_user() {
         return
     fi
 
+    # Hitung tanggal expired
     if [[ "$days" -eq 0 ]]; then
         expiry="unlimited"
+        expe="Unlimited"
     else
         expiry=$(date -d "+$days days" +%Y-%m-%d)
+        tgl=$(date -d "+$days days" +"%d")
+        bln=$(date -d "+$days days" +"%b")
+        thn=$(date -d "+$days days" +"%Y")
+        expe="$tgl $bln, $thn"
     fi
 
+    # Tanggal hari ini
+    tgl2=$(date +"%d")
+    bln2=$(date +"%b")
+    thn2=$(date +"%Y")
+    tnggl="$tgl2 $bln2, $thn2"
+
+    # Simpan ke database
     echo "$password|$expiry" >> "$USERS_DB"
     update_config_json
 
     echo ""
-echo ""
-echo -e "${WHITE}═════════════════${NC}"
-echo -e "${GREEN}  ✓ Terima kasih sudah order kak😁${NC}"
-echo -e "${WHITE}═════════════════${NC}"
-echo -e "  ${CYAN}ZIVPN UDP${NC}"
-echo -e "${WHITE}═════════════════${NC}"
+    echo -e "${WHITE}═════════════════${NC}"
+    echo -e "${GREEN}  ✓ Terima kasih sudah order kak😁${NC}"
+    echo -e "${WHITE}═════════════════${NC}"
+    echo -e "  ${CYAN}ZIVPN UDP${NC}"
+    echo -e "${WHITE}═════════════════${NC}"
 
-# Informasi Server dan User
-if [[ -n "$DOMAIN" ]]; then
-    echo -e "  Domain      : ${CYAN}$DOMAIN${NC}"
-else
-    echo -e "  Domain      : ${RED}Belum diatur${NC}"
-    echo -e "  IP Server   : ${CYAN}$(get_ip)${NC}"
-fi
-echo -e "  Password    : ${YELLOW}$password${NC}"
-echo -e "  Lokasi      : ${CYAN}$(get_city)${NC}"
-echo -e "  ${WHITE}────────────────${NC}"
-echo -e "  Tanggal Buat: ${GREEN}$tnggl${NC}"
+    # Informasi Server dan User
+    if [[ -n "$DOMAIN" ]]; then
+        echo -e "  Domain      : ${CYAN}$DOMAIN${NC}"
+    else
+        echo -e "  Domain      : ${RED}Belum diatur${NC}"
+        echo -e "  IP Server   : ${CYAN}$(get_ip)${NC}"
+    fi
+    echo -e "  Password    : ${YELLOW}$password${NC}"
+    echo -e "  Lokasi      : ${CYAN}$(get_city)${NC}"
+    echo -e "  ${WHITE}────────────────${NC}"
+    echo -e "  Tanggal Buat: ${GREEN}$tnggl${NC}"
 
-if [[ "$days" -eq 0 ]]; then
-    echo -e "  Tanggal Exp : ${GREEN}Unlimited${NC}"
-    echo -e "  Masa Aktif  : ${GREEN}Selamanya${NC}"
-else
-    echo -e "  Tanggal Exp : ${YELLOW}$expe${NC}"
-    echo -e "  Masa Aktif  : ${YELLOW}${days} hari${NC}"
-fi
+    if [[ "$days" -eq 0 ]]; then
+        echo -e "  Tanggal Exp : ${GREEN}Unlimited${NC}"
+        echo -e "  Masa Aktif  : ${GREEN}Selamanya${NC}"
+    else
+        echo -e "  Tanggal Exp : ${YELLOW}$expe${NC}"
+        echo -e "  Masa Aktif  : ${YELLOW}${days} hari${NC}"
+    fi
 
-echo -e "${WHITE}────────────────${NC}"
-echo -e "  ${YELLOW}Tutorial ZIVPN APP / UDP Tunnel${NC}"
-echo -e "${WHITE}────────────────${NC}"
-echo -e "  1. Buka ZIVPN App"
-echo -e "  2. Centang Udp"
-echo -e "  3. Klik Garis tiga ( dipojok kiri atas )"
-echo -e "  4. Klik Udp tunnel setting"
+    echo -e "${WHITE}────────────────${NC}"
+    echo -e "  ${YELLOW}Tutorial ZIVPN APP / UDP Tunnel${NC}"
+    echo -e "${WHITE}────────────────${NC}"
+    echo -e "  1. Buka ZIVPN App"
+    echo -e "  2. Centang Udp"
+    echo -e "  3. Pilih negara bebas si (saran Singapore premium 5)"
+    echo -e "  4. Klik Garis tiga ( dipojok kiri atas )"
+    echo -e "  5. Klik Udp tunnel setting"
 
-if [[ -n "$DOMAIN" ]]; then
-    echo -e "  5. UDP Server  : ${CYAN}$DOMAIN${NC}"
-else
-    echo -e "  5. UDP Server  : ${CYAN}$(get_ip)${NC}"
-fi
-echo -e "     UDP Password: ${CYAN}$password${NC}"
-echo -e "  6. Klik APPLY → START"
-echo -e "${WHITE}═════════════════${NC}"
-echo ""
-press_enter
+    if [[ -n "$DOMAIN" ]]; then
+        echo -e "  6. UDP Server  : ${CYAN}$DOMAIN${NC}"
+    else
+        echo -e "  6. UDP Server  : ${CYAN}$(get_ip)${NC}"
+    fi
+    echo -e "     UDP Password: ${CYAN}$password${NC}"
+    echo -e "  7. Klik APPLY → START"
+    echo -e "${WHITE}═════════════════${NC}"
+    echo ""
+    press_enter
 }
 
 # === HAPUS USER ===
@@ -1113,7 +1135,7 @@ update_script() {
     echo ""
 
     # Ganti URL ini dengan URL raw script GitHub kamu nanti
-    local SCRIPT_URL="https://raw.githubusercontent.com/script-VIP/Vip/main/udp/zo.sh"
+    local SCRIPT_URL="https://raw.githubusercontent.com/script-VIP/Vip/main/udp/zoy.sh"
     local SCRIPT_PATH=$(realpath "$0")
 
     echo -e "  Mengecek update dari GitHub..."
@@ -1204,22 +1226,20 @@ main_menu() {
                 *) echo -e "${RED}Pilihan tidak valid!${NC}"; sleep 1 ;;
             esac
         else
-            echo -e "  ${GREEN}1${NC}. Tambah User"
-            echo -e "  ${RED}2${NC}. Hapus User"
-            echo -e "  ${CYAN}3${NC}. Daftar User"
-            echo -e "  ${YELLOW}4${NC}. Perpanjang User"
-            echo -e "  ${PURPLE}5${NC}. Hapus User Expired"
+            echo -e "  ${GREEN}1${WHITE}. Tambah User"
+            echo -e "  ${RED}2${WHITE}. Hapus User"
+            echo -e "  ${CYAN}3${WHITE}. Daftar User"
+            echo -e "  ${YELLOW}4${WHITE}. Perpanjang User"
             echo ""
-            echo -e "  ${BLUE}6${NC}. Status Service"
-            echo -e "  ${BLUE}7${NC}. Restart Service"
-            echo ""
-            echo -e "  ${MAGENTA}8${NC}. Backup Manual"
-            echo -e "  ${MAGENTA}9${NC}. Restore Backup"
-            echo -e "  ${MAGENTA}10${NC}. Konfigurasi Backup"
-            echo ""
-            echo -e "  ${GREEN}11${NC}. Update Script"
-            echo -e "  ${RED}12${NC}. Uninstall ZIVPN"
-            echo -e "  ${CYAN}13${NC}. Set Domain"
+            echo -e "  ${PURPLE}5${WHITE}. Hapus User Expired"
+            echo -e "  ${BLUE}6${WHITE}. Status Service"
+            echo -e "  ${BLUE}7${WHITE}. Restart Service"
+            echo -e "  ${MAGENTA}8${WHITE}. Backup Manual"
+            echo -e "  ${MAGENTA}9${WHITE}. Restore Backup"
+            echo -e "  ${MAGENTA}10${WHITE}. Konfigurasi Backup"
+            echo -e "  ${GREEN}11${WHITE}. Update Script"
+            echo -e "  ${RED}12${WHITE}. Uninstall ZIVPN"
+            echo -e "  ${CYAN}13${WHITE}. Set Domain"
             echo ""
             echo -e "${WHITE}  ────────────────────────────────────────${NC}"
             read -rp "$(echo -e "  ${WHITE}Pilih menu [1-13] : ${NC}")" choice
