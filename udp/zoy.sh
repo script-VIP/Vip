@@ -886,7 +886,7 @@ add_user() {
     echo -e "${WHITE}────────────────${NC}"
     echo -e "  1. Buka ZIVPN App"
     echo -e "  2. Centang Udp"
-    echo -e "  3. Pilih negara bebas si (saran Singapore premium 5)"
+    echo -e "  3. klik negaranya bebas ( Sg premium 5 )"
     echo -e "  4. Klik Garis tiga ( dipojok kiri atas )"
     echo -e "  5. Klik Udp tunnel setting"
 
