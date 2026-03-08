@@ -956,7 +956,7 @@ backup_menu() {
     done
 }
 
-# === MENU UTAMA ===
+# === MENU UTAMA (DENGAN PERBAIKAN) ===
 main_menu() {
     while true; do
         banner
@@ -969,6 +969,11 @@ main_menu() {
             echo ""
             echo -e "${WHITE}  ────────────────────────────────────────${NC}"
             read -rp "$(echo -e "  ${WHITE}Pilih menu : ${NC}")" choice
+            if [[ -z "$choice" ]]; then
+                echo -e "${YELLOW}Input tidak boleh kosong!${NC}"
+                sleep 1
+                continue
+            fi
             case $choice in
                 1) 
                     if [[ -f "/root/installziv.sh" ]]; then
@@ -999,7 +1004,14 @@ main_menu() {
             echo -e "  ${WHITE}0${NC}. Keluar"
             echo ""
             echo -e "${WHITE}  ────────────────────────────────────────${NC}"
+            
+            # PERBAIKAN: Cek input kosong
             read -rp "$(echo -e "  ${WHITE}Pilih menu [0-12] : ${NC}")" choice
+            if [[ -z "$choice" ]]; then
+                echo -e "${YELLOW}Input tidak boleh kosong!${NC}"
+                sleep 1
+                continue
+            fi
 
             case $choice in
                 1) add_user ;;
@@ -1023,5 +1035,3 @@ main_menu() {
         fi
     done
 }
-
-
