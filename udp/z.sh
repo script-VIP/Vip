@@ -4,7 +4,18 @@
 #   By: Custom Script (based on ZIVPN official binary)
 #   OS: Ubuntu 20.04 / 22.04 / 24.04
 # =============================================
+# Hitung tanggal expired
+expi=$(date -d "+$days days" +"%Y-%m-%d")
+tgl=$(date -d "+$days days" +"%d")
+bln=$(date -d "+$days days" +"%b")
+thn=$(date -d "+$days days" +"%Y")
+expe="$tgl $bln, $thn"
 
+# Tanggal hari ini
+tgl2=$(date +"%d")
+bln2=$(date +"%b")
+thn2=$(date +"%Y")
+tnggl="$tgl2 $bln2, $thn2" 
 # === WARNA ===
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -834,6 +845,7 @@ add_user() {
     update_config_json
 
     echo ""
+echo ""
 echo -e "${WHITE}═════════════════${NC}"
 echo -e "${GREEN}  ✓ Terima kasih sudah order kak😁${NC}"
 echo -e "${WHITE}═════════════════${NC}"
@@ -848,16 +860,15 @@ else
     echo -e "  IP Server   : ${CYAN}$(get_ip)${NC}"
 fi
 echo -e "  Password    : ${YELLOW}$password${NC}"
-echo -e "  ISP Server  : ${CYAN}$(get_isp)${NC}"
 echo -e "  Lokasi      : ${CYAN}$(get_city)${NC}"
 echo -e "  ${WHITE}────────────────${NC}"
-echo -e "  Tanggal Buat: ${GREEN}$(date +"%Y-%m-%d")${NC}"
+echo -e "  Tanggal Buat: ${GREEN}$tnggl${NC}"
 
-if [[ "$expiry" == "unlimited" ]]; then
+if [[ "$days" -eq 0 ]]; then
     echo -e "  Tanggal Exp : ${GREEN}Unlimited${NC}"
     echo -e "  Masa Aktif  : ${GREEN}Selamanya${NC}"
 else
-    echo -e "  Tanggal Exp : ${YELLOW}$expiry${NC}"
+    echo -e "  Tanggal Exp : ${YELLOW}$expe${NC}"
     echo -e "  Masa Aktif  : ${YELLOW}${days} hari${NC}"
 fi
 
@@ -878,7 +889,6 @@ echo -e "     UDP Password: ${CYAN}$password${NC}"
 echo -e "  6. Klik APPLY → START"
 echo -e "${WHITE}═════════════════${NC}"
 echo ""
-press_enter
 }
 
 # === HAPUS USER ===
@@ -1102,7 +1112,7 @@ update_script() {
     echo ""
 
     # Ganti URL ini dengan URL raw script GitHub kamu nanti
-    local SCRIPT_URL="https://raw.githubusercontent.com/script-VIP/Vip/main/udp/zive.sh"
+    local SCRIPT_URL="https://raw.githubusercontent.com/script-VIP/Vip/main/udp/z.sh"
     local SCRIPT_PATH=$(realpath "$0")
 
     echo -e "  Mengecek update dari GitHub..."
