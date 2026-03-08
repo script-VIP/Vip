@@ -1134,7 +1134,7 @@ main_menu() {
                 9) backup_menu ;;
                 10) update_script ;;
                 11) uninstall_zivpn ;;
-                *) echo -e "${RED}Pilihan tidak valid!${NC}"; sleep 1 ;;
+                *) echo -e "${RED}Pilihan tidak valid!${NC}";;
             esac
         fi
     done
@@ -1160,7 +1160,7 @@ backup_menu() {
             2) list_backup ;;
             3) restore_backup ;;
             4) break ;;
-            *) echo -e "${RED}Pilihan tidak valid!${NC}"; sleep 1 ;;
+            *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
     done
 }
