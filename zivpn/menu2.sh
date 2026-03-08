@@ -584,8 +584,6 @@ uninstall_zivpn() {
     echo ""
     sleep 2
     exit 0
-     fi
-    done
 }
 
 # === MENU UTAMA ===
@@ -651,8 +649,6 @@ main_menu() {
                     ;;
                 *) echo -e "${RED}Pilihan tidak valid!${NC}"; sleep 1 ;;
             esac
-        fi
-    done
 }
 
 # === ENTRY POINT ===
