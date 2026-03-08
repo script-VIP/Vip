@@ -42,9 +42,9 @@ check_root() {
     fi
 }
 
-#get_ip() {
-    #curl -4 -s ifconfig.me 2>/dev/null || curl -4 -s icanhazip.com 2>/dev/null || hostname -I | awk '{for(i=1;i<=NF;i++) if($i !~ /:/) {print $i; exit}}'
-#}
+get_ip() {
+    curl -4 -s ifconfig.me 2>/dev/null || curl -4 -s icanhazip.com 2>/dev/null || hostname -I | awk '{for(i=1;i<=NF;i++) if($i !~ /:/) {print $i; exit}}'
+}
 
 get_domain() {
     local ip=$(get_ip)
@@ -289,11 +289,12 @@ is_installed() {
 }
 
 show_header() {
-    clear
+ clear
     echo -e "${WHITE}╔══════════════════════════════════════════════════════════╗${NC}"
     echo -e "${WHITE}║${YELLOW}              ZIVPN UDP MANAGER - AUTO BACKUP            ${WHITE}║${NC}"
     echo -e "${WHITE}╚══════════════════════════════════════════════════════════╝${NC}"
     echo ""
+    clear
 }
 
 press_enter() {
