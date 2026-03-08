@@ -770,7 +770,7 @@ CRONEOF
     echo -e "${WHITE}══════════════════════════════════════════${NC}"
     echo -e "${GREEN}  ✓ ZIVPN UDP BERHASIL DIINSTALL!${NC}"
     echo -e "${WHITE}══════════════════════════════════════════${NC}"
-    echo -e "  IP VPS  : ${CYAN}$(get_ip)${NC}"
+    echo -e "  DOMAIN  : ${CYAN}$DOMAIN ${NC}"
     echo -e "  Port    : ${CYAN}5667 / 6000-19999 (UDP)${NC}"
     echo -e "  Status  : ${GREEN}$(systemctl is-active zivpn.service)${NC}"
     echo -e "${WHITE}══════════════════════════════════════════${NC}"
@@ -1102,7 +1102,7 @@ update_script() {
     echo ""
 
     # Ganti URL ini dengan URL raw script GitHub kamu nanti
-    local SCRIPT_URL="https://raw.githubusercontent.com/script-VIP/Vip/main/udp/zivo.sh"
+    local SCRIPT_URL="https://raw.githubusercontent.com/script-VIP/Vip/main/udp/zive.sh"
     local SCRIPT_PATH=$(realpath "$0")
 
     echo -e "  Mengecek update dari GitHub..."
