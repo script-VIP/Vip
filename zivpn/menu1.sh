@@ -584,6 +584,8 @@ uninstall_zivpn() {
     echo ""
     sleep 2
     exit 0
+     fi
+    done
 }
 
 # === MENU UTAMA ===
