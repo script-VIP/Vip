@@ -300,18 +300,18 @@ fi
 FILE_SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
 
 # Buat caption
-CAPTION="✅ <b>AUTO BACKUP ZIVPN</b>
-══════════════════════════════════════════
-<b>Waktu Backup :</b> $DATE_NOW
-<b>IP Address   :</b> $IP_ADDRESS
-<b>Domain       :</b> $DOMAIN_NAME
-<b>ISP          :</b> $ISP_NAME
-<b>Lokasi       :</b> $CITY_NAME
-<b>Jumlah User  :</b> $USER_COUNT User
-<b>Ukuran File  :</b> $FILE_SIZE
-<b>Nama File    :</b> $(basename $BACKUP_FILE)
-══════════════════════════════════════════
-Auto backup dijalankan setiap 6 jam"
+CAPTION="✅ AUTO BACKUP ZIVPN
+════════════════════════
+Waktu Backup : $DATE_NOW
+IP Address   : $IP_ADDRESS
+Domain       : $DOMAIN_NAME
+ISP          : $ISP_NAME
+Lokasi       : $CITY_NAME
+Jumlah User  : $USER_COUNT User
+Ukuran File  : $FILE_SIZE
+Nama File    : $(basename $BACKUP_FILE)
+════════════════════════
+"
 
 # Kirim ke Telegram
 send_telegram_file "$BACKUP_FILE" "$CAPTION"
