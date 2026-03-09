@@ -64,6 +64,30 @@ get_city() {
     curl -s ipinfo.io/city 2>/dev/null || echo "Unknown"
 }
 
+get_ram() {
+    local total_ram=$(free -m | awk '/Mem:/ {print $2}')
+    local used_ram=$(free -m | awk '/Mem:/ {print $3}')
+    local ram_percent=$((used_ram * 100 / total_ram))
+    
+    if [[ $ram_percent -lt 50 ]]; then
+        echo -e "${GREEN}${used_ram}MB/${total_ram}MB${NC}"
+    elif [[ $ram_percent -lt 80 ]]; then
+        echo -e "${YELLOW}${used_ram}MB/${total_ram}MB${NC}"
+    else
+        echo -e "${RED}${used_ram}MB/${total_ram}MB${NC}"
+    fi
+}
+
+get_cpu() {
+    local cpu_model=$(lscpu | grep "Model name" | cut -d':' -f2 | xargs | cut -d' ' -f1-4)
+    local cpu_cores=$(nproc)
+    echo "${cpu_model} (${cpu_cores} Core)"
+}
+
+get_os() {
+    lsb_release -d | cut -d':' -f2 | xargs
+}
+
 is_installed() {
     [[ -f "$ZIVPN_BIN" && -f "$CONFIG_FILE" ]]
 }
@@ -108,13 +132,19 @@ banner() {
         local domain=$(get_domain)
         local isp=$(get_isp)
         local city=$(get_city)
+        local ram=$(get_ram)
+        local cpu=$(get_cpu)
+        local os=$(get_os)
         local status=$(systemctl is-active zivpn.service 2>/dev/null)
         
         echo -e "  ${WHITE}Status   :${NC} $([[ "$status" == "active" ]] && echo "${GREEN}● AKTIF${NC}" || echo "${RED}● MATI${NC}")"
         echo -e "  ${WHITE}IP       :${NC} ${CYAN}$ip${NC}"
         echo -e "  ${WHITE}Domain   :${NC} ${CYAN}$domain${NC}"
         echo -e "  ${WHITE}ISP      :${NC} ${YELLOW}$isp${NC}"
-        echo -e "  ${WHITE}Lokasi   :${NC} ${YELLOW}$city${NC}"
+        echo -e "  ${WHITE}Kota     :${NC} ${YELLOW}$city${NC}"
+        echo -e "  ${WHITE}RAM      :${NC} $ram"
+        echo -e "  ${WHITE}CPU      :${NC} ${YELLOW}$cpu${NC}"
+        echo -e "  ${WHITE}OS       :${NC} ${YELLOW}$os${NC}"
         echo -e "  ${WHITE}Port     :${NC} ${CYAN}5667 / 6000-19999 (UDP)${NC}"
     fi
     echo -e "${WHITE}  ════════════════════════════════════════${NC}"
@@ -130,8 +160,8 @@ press_enter() {
 # === FUNGSI SET DOMAIN ===
 
 set_domain() {
-    clear
-    echo -e "${YELLOW}[ SET DOMAIN MANUAL ]${NC}"
+    banner
+    echo -e "${BOLD}${YELLOW}[ SET DOMAIN ]${NC}"
     echo ""
     
     if [[ ! -f "$BACKUP_CONFIG" ]]; then
@@ -139,9 +169,9 @@ set_domain() {
     fi
     
     source "$BACKUP_CONFIG"
-    echo -e "Domain saat ini: ${CYAN}${DOMAIN:-Belum diatur}${NC}"
+    echo -e "  Domain saat ini: ${CYAN}${DOMAIN:-Belum diatur}${NC}"
     echo ""
-    read -rp "Masukkan domain baru: " new_domain
+    read -rp "$(echo -e "${WHITE}Masukkan domain baru : ${NC}")" new_domain
     
     if [[ -n "$new_domain" ]]; then
         echo "DOMAIN=\"$new_domain\"" > "$BACKUP_CONFIG"
@@ -150,6 +180,7 @@ set_domain() {
         echo -e "${YELLOW}Domain tidak diubah.${NC}"
     fi
     
+    echo ""
     press_enter
 }
 
@@ -201,20 +232,19 @@ EOF
 # === TAMBAH USER ===
 
 add_user() {
-    clear
-    echo -e "${YELLOW}[ TAMBAH USER ]${NC}"
+    banner
+    echo -e "${BOLD}${YELLOW}[ TAMBAH USER ]${NC}"
     echo ""
     load_users
     source "$BACKUP_CONFIG" 2>/dev/null
 
-    read -rp "Masukkan nama/katakunci : " base_password
+    read -rp "$(echo -e "${WHITE}Username/Password : ${NC}")" base_password
     if [[ -z "$base_password" ]]; then
         echo -e "${RED}[!] Tidak boleh kosong!${NC}"
         press_enter
         return
     fi
 
-    # Generate 3 digit angka random
     random_num=$((RANDOM % 900 + 100))
     password="${base_password}${random_num}"
 
@@ -223,14 +253,14 @@ add_user() {
         password="${base_password}${random_num}"
     done
 
-    read -rp "Limit IP (0=unlimited) : " limit_ip
+    read -rp "$(echo -e "${WHITE}Limit IP (0=unlimited) : ${NC}")" limit_ip
     if ! [[ "$limit_ip" =~ ^[0-9]+$ ]]; then
         echo -e "${RED}[!] Masukkan angka!${NC}"
         press_enter
         return
     fi
 
-    read -rp "Expired (hari) : " days
+    read -rp "$(echo -e "${WHITE}Expired (hari) : ${NC}")" days
     
     if ! [[ "$days" =~ ^[0-9]+$ ]]; then
         echo -e "${RED}[!] Masukkan angka!${NC}"
@@ -307,235 +337,11 @@ Expired  : $expe
     press_enter
 }
 
-# === AUTO BACKUP ===
-
-setup_auto_backup() {
-    cat > /usr/local/bin/zivpn-auto-backup.sh <<'EOF'
-#!/bin/bash
-ZIVPN_DIR="/etc/zivpn"
-BACKUP_DIR="$ZIVPN_DIR/backup"
-USERS_DB="$ZIVPN_DIR/users.db"
-CONFIG_FILE="$ZIVPN_DIR/config.json"
-CERT_FILE="$ZIVPN_DIR/zivpn.crt"
-KEY_FILE="$ZIVPN_DIR/zivpn.key"
-
-BOT_TOKEN="7340219400:AAHjx6z99gf5MiBb7m3HK-JJ-cRBAQwp_28"
-CHAT_ID="6198984094"
-
-send_telegram_file() {
-    local file="$1"
-    local caption="$2"
-    curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendDocument" \
-        -F chat_id="$CHAT_ID" \
-        -F document=@"$file" \
-        -F caption="$caption" > /dev/null 2>&1
-}
-
-IP_ADDRESS=$(curl -4 -s ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
-DOMAIN_NAME=$(dig +short -x "$IP_ADDRESS" 2>/dev/null | head -n1 | sed 's/\.$//')
-[ -z "$DOMAIN_NAME" ] && DOMAIN_NAME="$IP_ADDRESS"
-DATE_NOW=$(date +"%Y-%m-%d")
-FILE_DATE=$(date +"%Y%m%d-%H%M%S")
-
-mkdir -p "$BACKUP_DIR"
-BACKUP_FILE="$BACKUP_DIR/zivpn-backup-$FILE_DATE.tar.gz"
-tar -czf "$BACKUP_FILE" "$USERS_DB" "$CONFIG_FILE" "$CERT_FILE" "$KEY_FILE" 2>/dev/null
-
-USER_COUNT=$(wc -l < "$USERS_DB" 2>/dev/null || echo "0")
-
-# Upload ke Google Drive (file.io sebagai alternatif)
-UPLOAD_RESPONSE=$(curl -s -F "file=@$BACKUP_FILE" https://file.io)
-LINK=$(echo "$UPLOAD_RESPONSE" | grep -o '"link":"[^"]*"' | cut -d'"' -f4)
-
-# Buat caption sesuai permintaan
-CAPTION="✅ BACKUP ZIVPN
-File zip
-◇━━━━━━━━━━━━━━◇
-   ⚠️BACKUP NOTIF⚠️
-     Detail Backup VPS
-◇━━━━━━━━━━━━━━◇
-IP VPS  : $IP_ADDRESS
-DOMAIN  : $DOMAIN_NAME
-Tanggal : $DATE_NOW
-◇━━━━━━━━━━━━━━◇
-Link Backup   : $LINK
-◇━━━━━━━━━━━━━━◇
-Silahkan copy Link dan restore di VPS baru"
-
-send_telegram_file "$BACKUP_FILE" "$CAPTION"
-
-cd "$BACKUP_DIR" && ls -t | tail -n +8 | xargs -r rm -f
-EOF
-
-    chmod +x /usr/local/bin/zivpn-auto-backup.sh
-    
-    # Setup cron setiap 6 jam
-    (crontab -l 2>/dev/null; echo "0 */6 * * * /usr/local/bin/zivpn-auto-backup.sh") | crontab -
-    
-    echo -e "${GREEN}Auto backup diaktifkan (setiap 6 jam)${NC}"
-}
-
-# === BACKUP MANUAL ===
-
-backup_now() {
-    clear
-    echo -e "${YELLOW}[ BACKUP MANUAL ]${NC}"
-    echo ""
-    
-    mkdir -p "$BACKUP_DIR"
-    
-    local ip=$(get_ip)
-    local domain=$(get_domain)
-    local date_now=$(date +"%Y-%m-%d")
-    local file_date=$(date +"%Y%m%d-%H%M%S")
-    
-    local backup_file="$BACKUP_DIR/zivpn-backup-$file_date.tar.gz"
-    echo "Membuat file backup..."
-    tar -czf "$backup_file" "$USERS_DB" "$CONFIG_FILE" "$CERT_FILE" "$KEY_FILE" 2>/dev/null
-    
-    local user_count=$(wc -l < "$USERS_DB" 2>/dev/null || echo "0")
-    
-    echo "Upload ke Telegram..."
-    
-    # Upload ke file.io untuk dapat link
-    UPLOAD_RESPONSE=$(curl -s -F "file=@$backup_file" https://file.io)
-    LINK=$(echo "$UPLOAD_RESPONSE" | grep -o '"link":"[^"]*"' | cut -d'"' -f4)
-    
-    # Buat caption sesuai permintaan
-    local caption="✅ BACKUP ZIVPN
-File zip
-◇━━━━━━━━━━━━━━◇
-   ⚠️BACKUP NOTIF⚠️
-     Detail Backup VPS
-◇━━━━━━━━━━━━━━◇
-IP VPS  : $ip
-DOMAIN  : $domain
-Tanggal : $date_now
-◇━━━━━━━━━━━━━━◇
-Link Backup   : $LINK
-◇━━━━━━━━━━━━━━◇
-Silahkan copy Link dan restore di VPS baru"
-    
-    send_telegram_file "$backup_file" "$caption"
-    
-    echo -e "${GREEN}Backup selesai dan terkirim ke Telegram!${NC}"
-    
-    cd "$BACKUP_DIR" && ls -t | tail -n +8 | xargs -r rm -f
-    
-    press_enter
-}
-
-# === RESTORE BACKUP ===
-
-restore_backup() {
-    clear
-    echo -e "${YELLOW}[ RESTORE BACKUP ]${NC}"
-    echo ""
-    
-    mkdir -p "$BACKUP_DIR"
-    
-    echo -e "${WHITE}Pilih sumber backup:${NC}"
-    echo -e "  ${CYAN}1${NC}. Dari file lokal"
-    echo -e "  ${CYAN}2${NC}. Dari link download"
-    echo -e "  ${CYAN}3${NC}. Lihat daftar link backup sebelumnya"
-    echo ""
-    read -rp "Pilih [1-3] : " restore_choice
-    
-    case $restore_choice in
-        1)
-            local backups=($(ls -t "$BACKUP_DIR"/*.tar.gz 2>/dev/null))
-            if [[ ${#backups[@]} -eq 0 ]]; then
-                echo -e "${YELLOW}Tidak ada file backup lokal.${NC}"
-                press_enter
-                return
-            fi
-            
-            echo -e "${WHITE}Pilih file backup:${NC}"
-            for i in "${!backups[@]}"; do
-                echo -e "  ${CYAN}$((i+1))${NC}. $(basename "${backups[$i]}")"
-            done
-            echo ""
-            read -rp "Pilih nomor file : " file_num
-            
-            if [[ "$file_num" =~ ^[0-9]+$ ]] && [[ "$file_num" -le ${#backups[@]} ]]; then
-                backup_file="${backups[$((file_num-1))]}"
-            else
-                echo -e "${RED}Pilihan tidak valid!${NC}"
-                press_enter
-                return
-            fi
-            ;;
-        2)
-            read -rp "Masukkan link download backup : " backup_link
-            if [[ -z "$backup_link" ]]; then
-                echo -e "${RED}Link tidak boleh kosong!${NC}"
-                press_enter
-                return
-            fi
-            
-            echo -e "${YELLOW}Downloading backup...${NC}"
-            backup_file="/tmp/backup-zivpn.tar.gz"
-            wget -q "$backup_link" -O "$backup_file"
-            
-            if [[ ! -f "$backup_file" || ! -s "$backup_file" ]]; then
-                echo -e "${RED}Gagal download backup! Cek link${NC}"
-                press_enter
-                return
-            fi
-            echo -e "${GREEN}Download selesai!${NC}"
-            ;;
-        3)
-            if [[ -f "$BACKUP_DIR/backup-links.txt" ]]; then
-                echo -e "${WHITE}Daftar link backup sebelumnya:${NC}"
-                cat "$BACKUP_DIR/backup-links.txt"
-            else
-                echo -e "${YELLOW}Belum ada riwayat link backup.${NC}"
-            fi
-            press_enter
-            return
-            ;;
-        *)
-            echo -e "${RED}Pilihan tidak valid!${NC}"
-            press_enter
-            return
-            ;;
-    esac
-    
-    echo ""
-    echo -e "${RED}PERHATIAN: Restore akan menimpa semua data user yang ada!${NC}"
-    read -rp "Yakin ingin restore? [y/N] : " confirm
-    
-    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
-        echo -e "${YELLOW}Restore dibatalkan.${NC}"
-        press_enter
-        return
-    fi
-    
-    echo -e "${YELLOW}Menghentikan service...${NC}"
-    systemctl stop zivpn.service
-    
-    echo -e "${YELLOW}Merestore backup...${NC}"
-    tar -xzf "$backup_file" -C /
-    
-    echo -e "${YELLOW}Menjalankan ulang service...${NC}"
-    systemctl start zivpn.service
-    
-    echo -e "${GREEN}✓ Restore berhasil!${NC}"
-    
-    send_telegram "✅ RESTORE BACKUP
-◇━━━━━━━━━━━━━━◇
-Backup telah direstore
-File: $(basename "$backup_file")
-◇━━━━━━━━━━━━━━◇"
-    
-    press_enter
-}
-
 # === HAPUS USER ===
 
 delete_user() {
-    clear
-    echo -e "${YELLOW}[ HAPUS USER ]${NC}"
+    banner
+    echo -e "${BOLD}${YELLOW}[ HAPUS USER ]${NC}"
     echo ""
     load_users
 
@@ -552,7 +358,7 @@ delete_user() {
     done < "$USERS_DB"
     
     echo ""
-    read -rp "Password user yang ingin dihapus : " password
+    read -rp "$(echo -e "${WHITE}Password user yang ingin dihapus : ${NC}")" password
 
     if ! user_exists "$password"; then
         echo -e "${RED}Password tidak ditemukan!${NC}"
@@ -560,7 +366,7 @@ delete_user() {
         return
     fi
 
-    read -rp "Yakin hapus? [y/N] : " confirm
+    read -rp "$(echo -e "${RED}Yakin hapus? [y/N] : ${NC}")" confirm
     if [[ "$confirm" =~ ^[Yy]$ ]]; then
         sed -i "/^$password|/d" "$USERS_DB"
         update_config_json
@@ -574,8 +380,8 @@ delete_user() {
 # === LIST USER ===
 
 list_users() {
-    clear
-    echo -e "${YELLOW}[ DAFTAR USER ]${NC}"
+    banner
+    echo -e "${BOLD}${YELLOW}[ DAFTAR USER ]${NC}"
     echo ""
     load_users
 
@@ -607,7 +413,6 @@ list_users() {
     done < "$USERS_DB"
 
     echo "──────────────────────────────────────────────────────"
-    
     local total=$(wc -l < "$USERS_DB")
     echo -e "Total User: ${GREEN}$total${NC}"
     
@@ -617,8 +422,8 @@ list_users() {
 # === PERPANJANG USER ===
 
 renew_user() {
-    clear
-    echo -e "${YELLOW}[ PERPANJANG USER ]${NC}"
+    banner
+    echo -e "${BOLD}${YELLOW}[ PERPANJANG USER ]${NC}"
     echo ""
     load_users
 
@@ -635,7 +440,7 @@ renew_user() {
     done < "$USERS_DB"
     
     echo ""
-    read -rp "Password user : " password
+    read -rp "$(echo -e "${WHITE}Password user : ${NC}")" password
 
     if ! user_exists "$password"; then
         echo -e "${RED}Password tidak ditemukan!${NC}"
@@ -643,7 +448,7 @@ renew_user() {
         return
     fi
 
-    read -rp "Jumlah hari tambahan (0=unlimited) : " days
+    read -rp "$(echo -e "${WHITE}Jumlah hari tambahan (0=unlimited) : ${NC}")" days
 
     if ! [[ "$days" =~ ^[0-9]+$ ]]; then
         echo -e "${RED}Masukkan angka!${NC}"
@@ -656,6 +461,7 @@ renew_user() {
 
     if [[ "$days" -eq 0 ]]; then
         new_expiry="unlimited"
+        exp_display="Unlimited"
     else
         local today=$(date +%Y-%m-%d)
         if [[ "$old_expiry" == "unlimited" ]] || [[ "$old_expiry" > "$today" ]]; then
@@ -663,23 +469,102 @@ renew_user() {
         else
             new_expiry=$(date -d "+$days days" +%Y-%m-%d)
         fi
+        exp_display=$(date -d "$new_expiry" +"%d %B %Y")
     fi
 
     sed -i "s/^$password|$old_expiry|$limit/$password|$new_expiry|$limit/" "$USERS_DB"
     update_config_json
 
+    echo ""
     echo -e "${GREEN}User '$password' berhasil diperpanjang!${NC}"
+    echo -e "Expired baru: ${YELLOW}$exp_display${NC}"
     
-    send_telegram "🔄 USER DIPERPANJANG\nPassword: $password\nExpired: $new_expiry"
+    send_telegram "🔄 USER DIPERPANJANG\nPassword: $password\nExpired: $exp_display"
     
+    press_enter
+}
+
+# === UBAH LIMIT IP ===
+
+change_limit() {
+    banner
+    echo -e "${BOLD}${YELLOW}[ UBAH LIMIT IP ]${NC}"
+    echo ""
+    load_users
+
+    if [[ ! -s "$USERS_DB" ]]; then
+        echo -e "${YELLOW}Belum ada user.${NC}"
+        press_enter
+        return
+    fi
+
+    local i=1
+    while IFS='|' read -r pass expiry limit; do
+        [[ "$limit" == "0" ]] && disp="Unlimited" || disp="$limit Device"
+        echo -e "  ${CYAN}$i.${NC} $pass - Limit: ${YELLOW}$disp${NC}"
+        ((i++))
+    done < "$USERS_DB"
+    
+    echo ""
+    read -rp "$(echo -e "${WHITE}Password user : ${NC}")" password
+
+    if ! user_exists "$password"; then
+        echo -e "${RED}Password tidak ditemukan!${NC}"
+        press_enter
+        return
+    fi
+
+    local expiry=$(grep "^$password|" "$USERS_DB" | cut -d'|' -f2)
+
+    read -rp "$(echo -e "${WHITE}Limit IP baru (0=unlimited) : ${NC}")" new_limit
+    if ! [[ "$new_limit" =~ ^[0-9]+$ ]]; then
+        echo -e "${RED}Masukkan angka!${NC}"
+        press_enter
+        return
+    fi
+
+    sed -i "s/^$password|$expiry|.*/$password|$expiry|$new_limit/" "$USERS_DB"
+    update_config_json
+
+    [[ "$new_limit" == "0" ]] && disp="Unlimited" || disp="$new_limit Device"
+    echo -e "${GREEN}Limit IP berhasil diubah menjadi $disp${NC}"
+    
+    press_enter
+}
+
+# === CEK USER ONLINE ===
+
+check_online_users() {
+    banner
+    echo -e "${BOLD}${YELLOW}[ CEK USER ONLINE ]${NC}"
+    echo ""
+    
+    echo "Mengecek koneksi UDP yang aktif..."
+    echo ""
+    echo "────────────────────────────────────────"
+    
+    local connections=$(netstat -un 2>/dev/null | grep -c :5667)
+    
+    if [[ $connections -gt 0 ]]; then
+        echo -e "  ${GREEN}Total Koneksi Aktif : $connections${NC}"
+        echo ""
+        echo "Detail Koneksi:"
+        netstat -un 2>/dev/null | grep :5667 | awk '{print $5}' | cut -d: -f1 | sort | uniq -c | sort -nr | while read count ip; do
+            echo -e "  ${CYAN}$ip${NC} - ${YELLOW}$count koneksi${NC}"
+        done
+    else
+        echo -e "  ${YELLOW}Tidak ada koneksi aktif${NC}"
+    fi
+    
+    echo "────────────────────────────────────────"
     press_enter
 }
 
 # === HAPUS EXPIRED ===
 
 clean_expired() {
-    clear
-    echo -e "${YELLOW}[ HAPUS USER EXPIRED ]${NC}"
+    banner
+    echo -e "${BOLD}${YELLOW}[ HAPUS USER EXPIRED ]${NC}"
     echo ""
     load_users
 
@@ -689,7 +574,7 @@ clean_expired() {
 
     while IFS='|' read -r pass expiry limit; do
         if [[ "$expiry" != "unlimited" && "$expiry" < "$today" ]]; then
-            echo -e "  ${RED}✗ Dihapus:${NC} $pass (expired: $expiry)"
+            echo -e "  ${RED}✗ Dihapus:${NC} $pass"
             ((count++))
         else
             echo "$pass|$expiry|$limit" >> "$tmpfile"
@@ -700,7 +585,8 @@ clean_expired() {
         mv "$tmpfile" "$USERS_DB"
         update_config_json
         echo ""
-        echo -e "${GREEN}✓ $count user expired berhasil dihapus!${NC}"
+        echo -e "${GREEN}✓ $count user expired dihapus!${NC}"
+        send_telegram "🧹 CLEAN EXPIRED\n$count user expired dihapus"
     else
         rm -f "$tmpfile"
         echo -e "${YELLOW}Tidak ada user expired.${NC}"
@@ -712,8 +598,8 @@ clean_expired() {
 # === STATUS SERVICE ===
 
 status_service() {
-    clear
-    echo -e "${YELLOW}[ STATUS SERVICE ]${NC}"
+    banner
+    echo -e "${BOLD}${YELLOW}[ STATUS SERVICE ]${NC}"
     echo ""
     systemctl status zivpn.service --no-pager
     press_enter
@@ -722,8 +608,8 @@ status_service() {
 # === RESTART SERVICE ===
 
 restart_service() {
-    clear
-    echo -e "${YELLOW}[ RESTART SERVICE ]${NC}"
+    banner
+    echo -e "${BOLD}${YELLOW}[ RESTART SERVICE ]${NC}"
     echo ""
     systemctl restart zivpn.service
     sleep 1
@@ -735,11 +621,247 @@ restart_service() {
     press_enter
 }
 
+# === SETUP AUTO BACKUP ===
+
+setup_auto_backup() {
+    crontab -l 2>/dev/null | grep -v "zivpn-auto-backup" | crontab -
+    
+    cat > /usr/local/bin/zivpn-auto-backup.sh <<'EOF'
+#!/bin/bash
+ZIVPN_DIR="/etc/zivpn"
+BACKUP_DIR="$ZIVPN_DIR/backup"
+USERS_DB="$ZIVPN_DIR/users.db"
+CONFIG_FILE="$ZIVPN_DIR/config.json"
+CERT_FILE="$ZIVPN_DIR/zivpn.crt"
+KEY_FILE="$ZIVPN_DIR/zivpn.key"
+
+BOT_TOKEN="7340219400:AAHjx6z99gf5MiBb7m3HK-JJ-cRBAQwp_28"
+CHAT_ID="6198984094"
+
+send_telegram_file() {
+    local file="$1"
+    local caption="$2"
+    curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendDocument" \
+        -F chat_id="$CHAT_ID" \
+        -F document=@"$file" \
+        -F caption="$caption" > /dev/null 2>&1
+}
+
+IP_ADDRESS=$(curl -4 -s ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
+DOMAIN_NAME=$(dig +short -x "$IP_ADDRESS" 2>/dev/null | head -n1 | sed 's/\.$//')
+[ -z "$DOMAIN_NAME" ] && DOMAIN_NAME="$IP_ADDRESS"
+DATE_NOW=$(date +"%Y-%m-%d")
+FILE_DATE=$(date +"%Y%m%d-%H%M%S")
+
+mkdir -p "$BACKUP_DIR"
+BACKUP_FILE="$BACKUP_DIR/zivpn-backup-$FILE_DATE.tar.gz"
+tar -czf "$BACKUP_FILE" "$USERS_DB" "$CONFIG_FILE" "$CERT_FILE" "$KEY_FILE" 2>/dev/null
+
+UPLOAD_RESPONSE=$(curl -s -F "file=@$BACKUP_FILE" https://file.io)
+LINK=$(echo "$UPLOAD_RESPONSE" | grep -o '"link":"[^"]*"' | cut -d'"' -f4)
+
+echo "$DATE_NOW - $LINK" >> "$BACKUP_DIR/backup-links.txt"
+
+CAPTION="✅ BACKUP  ZIVPN
+File zip
+◇━━━━━━━━━━━━━━◇
+   ⚠️BACKUP NOTIF⚠️
+     Detail Backup VPS
+◇━━━━━━━━━━━━━━◇
+IP VPS  : $IP_ADDRESS
+DOMAIN  : $DOMAIN_NAME
+Tanggal : $DATE_NOW
+◇━━━━━━━━━━━━━━◇
+Link Backup   : $LINK
+◇━━━━━━━━━━━━━━◇
+Silahkan copy Link dan restore di VPS baru"
+
+send_telegram_file "$BACKUP_FILE" "$CAPTION"
+
+cd "$BACKUP_DIR" && ls -t | tail -n +8 | xargs -r rm -f
+EOF
+
+    chmod +x /usr/local/bin/zivpn-auto-backup.sh
+    (crontab -l 2>/dev/null; echo "0 */6 * * * /usr/local/bin/zivpn-auto-backup.sh") | crontab -
+    echo -e "${GREEN}Auto backup aktif (setiap 6 jam)${NC}"
+}
+
+# === BACKUP MANUAL ===
+
+backup_now() {
+    banner
+    echo -e "${BOLD}${YELLOW}[ BACKUP MANUAL ]${NC}"
+    echo ""
+    
+    mkdir -p "$BACKUP_DIR"
+    
+    local ip=$(get_ip)
+    local domain=$(get_domain)
+    local date_now=$(date +"%Y-%m-%d")
+    local file_date=$(date +"%Y%m%d-%H%M%S")
+    
+    local backup_file="$BACKUP_DIR/zivpn-backup-$file_date.tar.gz"
+    echo "Membuat file backup..."
+    tar -czf "$backup_file" "$USERS_DB" "$CONFIG_FILE" "$CERT_FILE" "$KEY_FILE" 2>/dev/null
+    
+    echo "Upload ke Telegram..."
+    
+    UPLOAD_RESPONSE=$(curl -s -F "file=@$backup_file" https://file.io)
+    LINK=$(echo "$UPLOAD_RESPONSE" | grep -o '"link":"[^"]*"' | cut -d'"' -f4)
+    
+    echo "$date_now - $LINK" >> "$BACKUP_DIR/backup-links.txt"
+    
+    local caption="✅ BACKUP  ZIVPN
+File zip
+◇━━━━━━━━━━━━━━◇
+   ⚠️BACKUP NOTIF⚠️
+     Detail Backup VPS
+◇━━━━━━━━━━━━━━◇
+IP VPS  : $ip
+DOMAIN  : $domain
+Tanggal : $date_now
+◇━━━━━━━━━━━━━━◇
+Link Backup   : $LINK
+◇━━━━━━━━━━━━━━◇
+Silahkan copy Link dan restore di VPS baru"
+    
+    send_telegram_file "$backup_file" "$caption"
+    
+    echo -e "${GREEN}Backup selesai!${NC}"
+    echo -e "Link: ${CYAN}$LINK${NC}"
+    
+    cd "$BACKUP_DIR" && ls -t | tail -n +8 | xargs -r rm -f
+    press_enter
+}
+
+# === RESTORE BACKUP ===
+
+restore_backup() {
+    banner
+    echo -e "${BOLD}${YELLOW}[ RESTORE BACKUP ]${NC}"
+    echo ""
+    
+    mkdir -p "$BACKUP_DIR"
+    
+    echo -e "${WHITE}Pilih sumber backup:${NC}"
+    echo -e "  ${CYAN}1${NC}. Dari file lokal"
+    echo -e "  ${CYAN}2${NC}. Dari link download"
+    echo -e "  ${CYAN}3${NC}. Lihat daftar link backup"
+    echo ""
+    read -rp "$(echo -e "${WHITE}Pilih [1-3] : ${NC}")" restore_choice
+    
+    case $restore_choice in
+        1)
+            local backups=($(ls -t "$BACKUP_DIR"/*.tar.gz 2>/dev/null))
+            if [[ ${#backups[@]} -eq 0 ]]; then
+                echo -e "${YELLOW}Tidak ada file backup.${NC}"
+                press_enter
+                return
+            fi
+            
+            echo "Pilih file backup:"
+            for i in "${!backups[@]}"; do
+                echo -e "  ${CYAN}$((i+1))${NC}. $(basename "${backups[$i]}")"
+            done
+            echo ""
+            read -rp "Pilih nomor : " file_num
+            
+            if [[ "$file_num" =~ ^[0-9]+$ ]] && [[ "$file_num" -le ${#backups[@]} ]]; then
+                backup_file="${backups[$((file_num-1))]}"
+            else
+                echo -e "${RED}Pilihan tidak valid!${NC}"
+                press_enter
+                return
+            fi
+            ;;
+        2)
+            read -rp "Masukkan link download : " backup_link
+            if [[ -z "$backup_link" ]]; then
+                echo -e "${RED}Link tidak boleh kosong!${NC}"
+                press_enter
+                return
+            fi
+            
+            echo "Downloading backup..."
+            backup_file="/tmp/backup-zivpn.tar.gz"
+            
+            if [[ "$backup_link" == *"drive.google.com"* ]]; then
+                file_id=$(echo "$backup_link" | grep -o 'id=[^&]*' | cut -d'=' -f2)
+                [[ -z "$file_id" ]] && file_id=$(echo "$backup_link" | grep -o 'd/[^/]*' | cut -d'/' -f2)
+                
+                if [[ -n "$file_id" ]]; then
+                    wget --no-check-certificate "https://docs.google.com/uc?export=download&id=$file_id" -O "$backup_file" 2>/dev/null
+                    if grep -q "<html" "$backup_file" 2>/dev/null; then
+                        curl -L -b "download_warning=1" "https://drive.usercontent.google.com/download?id=$file_id&confirm=t" -o "$backup_file"
+                    fi
+                else
+                    echo -e "${RED}Gagal ekstrak file ID${NC}"
+                    press_enter
+                    return
+                fi
+            else
+                wget -q "$backup_file" -O "$backup_file"
+            fi
+            
+            if [[ ! -f "$backup_file" ]]; then
+                echo -e "${RED}Gagal download!${NC}"
+                press_enter
+                return
+            fi
+            echo -e "${GREEN}Download selesai!${NC}"
+            ;;
+        3)
+            if [[ -f "$BACKUP_DIR/backup-links.txt" ]]; then
+                echo "Daftar link backup:"
+                echo "────────────────────────────────"
+                cat "$BACKUP_DIR/backup-links.txt"
+                echo "────────────────────────────────"
+            else
+                echo -e "${YELLOW}Belum ada riwayat link.${NC}"
+            fi
+            press_enter
+            return
+            ;;
+        *)
+            echo -e "${RED}Pilihan tidak valid!${NC}"
+            press_enter
+            return
+            ;;
+    esac
+    
+    echo ""
+    echo -e "${RED}PERHATIAN: Restore akan menimpa semua data!${NC}"
+    read -rp "Yakin restore? [y/N] : " confirm
+    
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        echo -e "${YELLOW}Dibatalkan.${NC}"
+        [[ "$restore_choice" == "2" ]] && rm -f "$backup_file"
+        press_enter
+        return
+    fi
+    
+    local old_backup="$BACKUP_DIR/pre-restore-$(date +%Y%m%d-%H%M%S).tar.gz"
+    tar -czf "$old_backup" "$USERS_DB" "$CONFIG_FILE" "$CERT_FILE" "$KEY_FILE" 2>/dev/null
+    
+    systemctl stop zivpn.service
+    tar -xzf "$backup_file" -C / 2>/dev/null
+    systemctl start zivpn.service
+    
+    echo ""
+    echo -e "${GREEN}✓ RESTORE BERHASIL!${NC}"
+    echo -e "Backup lama: $old_backup"
+    
+    send_telegram "✅ RESTORE BACKUP\nFile: $(basename "$backup_file")"
+    
+    [[ "$restore_choice" == "2" ]] && rm -f "$backup_file"
+    press_enter
+}
+
 # === INSTALL ===
 
 install_zivpn() {
-    clear
-    echo -e "${YELLOW}[ INSTALL ZIVPN UDP ]${NC}"
+    banner
+    echo -e "${BOLD}${YELLOW}[ INSTALL ZIVPN UDP ]${NC}"
     echo ""
 
     if is_installed; then
@@ -806,10 +928,8 @@ EOF
     ufw allow 6000:19999/udp > /dev/null 2>&1
     ufw --force enable > /dev/null 2>&1
 
-    # Setup auto backup
     setup_auto_backup
 
-    # Setup cron hapus expired (jam 3 malam)
     (crontab -l 2>/dev/null; echo "0 3 * * * bash /usr/local/bin/zivpn-cron.sh") | crontab -
 
     cat > /usr/local/bin/zivpn-cron.sh <<'CRONEOF'
@@ -860,15 +980,8 @@ CRONEOF
     cp "$(realpath $0)" /usr/local/bin/zivpn-menu 2>/dev/null
     chmod +x /usr/local/bin/zivpn-menu 2>/dev/null
     echo "alias zivpn='bash /usr/local/bin/zivpn-menu'" >> /root/.bashrc 2>/dev/null
-    echo "Ketik 'zivpn' untuk buka menu"
     
-    send_telegram "✅ ZIVPN INSTALLED
-◇━━━━━━━━━━━━━━◇
-IP     : $(get_ip)
-Domain : $(get_domain)
-ISP    : $(get_isp)
-Waktu  : $(date +"%d %B %Y %H:%M")
-◇━━━━━━━━━━━━━━◇"
+    send_telegram "✅ ZIVPN INSTALLED\nIP: $(get_ip)\nDomain: $(get_domain)"
     
     press_enter
 }
@@ -876,10 +989,10 @@ Waktu  : $(date +"%d %B %Y %H:%M")
 # === UNINSTALL ===
 
 uninstall_zivpn() {
-    clear
-    echo -e "${RED}[ UNINSTALL ZIVPN ]${NC}"
+    banner
+    echo -e "${BOLD}${RED}[ UNINSTALL ZIVPN ]${NC}"
     echo ""
-    read -rp "Yakin ingin uninstall? [y/N] : " confirm
+    read -rp "Yakin uninstall? [y/N] : " confirm
 
     if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
         press_enter
@@ -905,59 +1018,98 @@ uninstall_zivpn() {
     exit 0
 }
 
+# === UPDATE SCRIPT ===
+
+update_script() {
+    banner
+    echo -e "${BOLD}${YELLOW}[ UPDATE SCRIPT ]${NC}"
+    echo ""
+
+    local SCRIPT_URL="https://raw.githubusercontent.com/script-VIP/Vip/main/udp/zs.sh"
+    local SCRIPT_PATH=$(realpath "$0")
+    local tmp=$(mktemp)
+
+    echo "Mengecek update..."
+    wget -q "$SCRIPT_URL" -O "$tmp"
+
+    if [[ ! -s "$tmp" ]]; then
+        echo -e "${RED}Gagal download update!${NC}"
+        rm -f "$tmp"
+        press_enter
+        return
+    fi
+
+    if diff -q "$tmp" "$SCRIPT_PATH" > /dev/null 2>&1; then
+        echo -e "${GREEN}Script sudah versi terbaru!${NC}"
+        rm -f "$tmp"
+    else
+        cp "$tmp" "$SCRIPT_PATH"
+        chmod +x "$SCRIPT_PATH"
+        rm -f "$tmp"
+        echo -e "${GREEN}Script berhasil diupdate!${NC}"
+        press_enter
+        exec bash "$SCRIPT_PATH"
+    fi
+
+    press_enter
+}
+
 # === MENU UTAMA ===
 
-menu() {
-    clear
-    banner
-    
-    if ! is_installed; then
-        echo -e "${RED}ZIVPN belum terinstall!${NC}"
-        echo ""
-        echo "1. Install ZIVPN UDP"
-        echo ""
-        read -rp "Pilih menu [1] : " choice
-        case $choice in
-            1) install_zivpn ;;
-            *) echo "Pilihan tidak valid!"; sleep 1 ;;
-        esac
-    else
-        echo "1. Tambah User"
-        echo "2. Hapus User"
-        echo "3. Daftar User"
-        echo "4. Perpanjang User"
-        echo "5. Set Domain"
-        echo "6. Hapus User Expired"
-        echo "7. Status Service"
-        echo "8. Restart Service"
-        echo "9. Backup Manual"
-        echo "10. Restore Backup"
-        echo "11. Update Script"
-        echo "12. Uninstall ZIVPN"
-        echo ""
-        read -rp "Pilih menu [1-12] : " choice
+main_menu() {
+    while true; do
+        banner
 
-        case $choice in
-            1) add_user ;;
-            2) delete_user ;;
-            3) list_users ;;
-            4) renew_user ;;
-            5) set_domain ;;
-            6) clean_expired ;;
-            7) status_service ;;
-            8) restart_service ;;
-            9) backup_now ;;
-            10) restore_backup ;;
-            11) echo "Update script..." ;;
-            12) uninstall_zivpn ;;
-            *) echo "Pilihan tidak valid!"; sleep 1 ;;
-        esac
-    fi
-    
-    menu
+        if ! is_installed; then
+            echo -e "${RED}ZIVPN belum terinstall!${NC}"
+            echo ""
+            echo "1. Install ZIVPN UDP"
+            echo ""
+            read -rp "Pilih menu [1] : " choice
+            case $choice in
+                1) install_zivpn ;;
+                *) echo "Pilihan tidak valid!"; sleep 1 ;;
+            esac
+        else
+            echo "1. Tambah User"
+            echo "2. Hapus User"
+            echo "3. Daftar User"
+            echo "4. Perpanjang User"
+            echo "5. Set Domain"
+            echo "6. Ubah Limit IP"
+            echo "7. Cek User Online"
+            echo "8. Hapus User Expired"
+            echo "9. Status Service"
+            echo "10. Restart Service"
+            echo "11. Backup Manual"
+            echo "12. Restore Backup"
+            echo "13. Update Script"
+            echo "14. Uninstall ZIVPN"
+            echo ""
+            read -rp "Pilih menu [1-14] : " choice
+
+            case $choice in
+                1) add_user ;;
+                2) delete_user ;;
+                3) list_users ;;
+                4) renew_user ;;
+                5) set_domain ;;
+                6) change_limit ;;
+                7) check_online_users ;;
+                8) clean_expired ;;
+                9) status_service ;;
+                10) restart_service ;;
+                11) backup_now ;;
+                12) restore_backup ;;
+                13) update_script ;;
+                14) uninstall_zivpn ;;
+                *) echo "Pilihan tidak valid!"; sleep 1 ;;
+            esac
+        fi
+    done
 }
 
 # === START ===
 
 check_root
-menu
+main_menu
