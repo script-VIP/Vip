@@ -46,6 +46,30 @@ get_ip() {
     curl -4 -s ifconfig.me 2>/dev/null || curl -4 -s icanhazip.com 2>/dev/null || hostname -I | awk '{print $1}'
 }
 
+set_domain() {
+    banner
+    echo -e "${BOLD}${YELLOW}[ SET DOMAIN ]${NC}"
+    echo ""
+    
+    init_backup_config
+    
+    local current_domain="$DOMAIN"
+    echo -e "  Domain saat ini: ${CYAN}${current_domain:-Belum diatur}${NC}"
+    echo ""
+    read -rp "$(echo -e "${WHITE}Masukkan domain baru (contoh: vpn.example.com) : ${NC}")" new_domain
+    
+    if [[ -z "$new_domain" ]]; then
+        echo -e "${YELLOW}Domain tidak diubah.${NC}"
+    else
+        DOMAIN="$new_domain"
+        save_backup_config
+        echo -e "${GREEN}Domain berhasil diubah menjadi: ${CYAN}$new_domain${NC}"
+    fi
+    
+    echo ""
+    press_enter
+}
+
 get_domain() {
     local ip=$(get_ip)
     local domain=""
@@ -1027,7 +1051,7 @@ update_script() {
     echo -e "${BOLD}${YELLOW}[ UPDATE SCRIPT ]${NC}"
     echo ""
 
-    local SCRIPT_URL="https://raw.githubusercontent.com/script-VIP/Vip/main/udp/zoyy.sh"
+    local SCRIPT_URL="https://raw.githubusercontent.com/script-VIP/Vip/main/udp/zoyyy.sh"
     local SCRIPT_PATH=$(realpath "$0")
     local tmp=$(mktemp)
 
@@ -1120,37 +1144,39 @@ main_menu() {
             echo -e "  ${RED}2${WHITE}. Hapus User"
             echo -e "  ${CYAN}3${WHITE}. Daftar User"
             echo -e "  ${YELLOW}4${WHITE}. Perpanjang User"
-            echo -e "  ${PURPLE}5${WHITE}. Ubah Limit IP"
+            echo -e "  ${GREEN}5${WHITE}. Setting Domain"
+            echo -e "  ${PURPLE}6${WHITE}. Ubah Limit IP"
             echo ""
-            echo -e "  ${MAGENTA}6${WHITE}. Cek User Online"
-            echo -e "  ${BLUE}7${WHITE}. Hapus User Expired"
-            echo -e "  ${BLUE}8${WHITE}. Status Service"
-            echo -e "  ${BLUE}9${WHITE}. Restart Service"
-            echo ""
-            echo -e "  ${GREEN}10${WHITE}. Backup Manual"
-            echo -e "  ${YELLOW}11${WHITE}. Restore Backup"
-            echo ""
-            echo -e "  ${CYAN}12${WHITE}. Update Script"
-            echo -e "  ${RED}13${WHITE}. Uninstall ZIVPN"
+            echo -e "  ${MAGENTA}7${WHITE}. Cek User Online"
+            echo -e "  ${BLUE}8${WHITE}. Hapus User Expired"
+            echo -e "  ${BLUE}9${WHITE}. Status Service"
+            echo -e "  ${BLUE}10${WHITE}. Restart Service"
+            
+            echo -e "  ${GREEN}11${WHITE}. Backup Manual"
+            echo -e "  ${YELLOW}12${WHITE}. Restore Backup"
+            
+            echo -e "  ${CYAN}13${WHITE}. Update Script"
+            echo -e "  ${RED}14${WHITE}. Uninstall ZIVPN"
             echo ""
             echo -e "${WHITE}  ────────────────────────────────────────${NC}"
-            read -rp "$(echo -e "  ${WHITE}Pilih menu [1-13] : ${NC}")" choice
+            read -rp "$(echo -e "  ${WHITE}Pilih menu [1-14] : ${NC}")" choice
 
             case $choice in
                 1) add_user ;;
                 2) delete_user ;;
                 3) list_users ;;
                 4) renew_user ;;
-                5) change_limit ;;
-                6) check_online_users ;;
-                7) clean_expired ;;
-                8) status_service ;;
-                9) restart_service ;;
-                10) backup_now ;;
-                11) restore_backup ;;
-                12) update_script ;;
-                13) uninstall_zivpn ;;
-                *) echo -e "${RED}Pilihan tidak valid!${NC}"; sleep 1 ;;
+                5) set_domain ;;
+                6) change_limit ;;
+                7) check_online_users ;;
+                8) clean_expired ;;
+                9) status_service ;;
+                10) restart_service ;;
+                11) backup_now ;;
+                12) restore_backup ;;
+                13) update_script ;;
+                14) uninstall_zivpn ;;
+                *) echo -e "${RED}Pilihan tidak valid!${NC}"; menu ;;
             esac
         fi
     done
