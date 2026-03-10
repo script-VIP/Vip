@@ -646,9 +646,10 @@ backup_menu() {
         echo "  1. Buat Backup"
         echo "  2. Lihat Daftar Backup"
         echo "  3. Restore dari File"
-        echo "  4. Konfigurasi Bot Telegram"
-        echo "  5. Pengaturan Auto Backup"
-        echo "  6. Kembali ke Menu Utama"
+        echo "  4. Restore dari Link"
+        echo "  5. Konfigurasi Bot Telegram"
+        echo "  6. Pengaturan Auto Backup"
+        echo "  7. Kembali ke Menu Utama"
         echo ""
         read -p "Pilih [1-6]: " subchoice
         
@@ -656,9 +657,10 @@ backup_menu() {
             1) backup_create ;;
             2) backup_list ;;
             3) backup_restore ;;
-            4) config_bot ;;
-            5) auto_backup_settings ;;
-            6) return ;;
+            4) restore_from_link
+            5) config_bot ;;
+            6) auto_backup_settings ;;
+            7) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}"; sleep 1 ;;
         esac
     done
@@ -722,7 +724,198 @@ Domain - ${DOMAIN_NAME//_/.}"
     echo ""
     read -p "Press Enter untuk kembali..."
 }
-
+# === FUNGSI RESTORE DARI LINK (SUPPORT ZIP DAN TAR.GZ) ===
+restore_from_link() {
+    show_header
+    echo -e "${YELLOW}»»» RESTORE DARI LINK «««${NC}"
+    echo ""
+    echo -e "${WHITE}Masukkan URL file backup (support .zip atau .tar.gz):${NC}"
+    echo -e "${CYAN}Contoh ZIP   : https://filename.web.id/backup.zip${NC}"
+    echo -e "${CYAN}Contoh TAR.GZ: https://filename.web.id/backup.tar.gz${NC}"
+    echo ""
+    read -p "URL: " backup_url
+    
+    if [ -z "$backup_url" ]; then
+        echo -e "${RED}[✗] URL tidak boleh kosong!${NC}"
+        sleep 2
+        return
+    fi
+    
+    # Validasi URL
+    if [[ ! "$backup_url" =~ ^https?:// ]]; then
+        echo -e "${RED}[✗] Format URL tidak valid! Gunakan http:// atau https://${NC}"
+        sleep 2
+        return
+    fi
+    
+    echo ""
+    echo -e "${YELLOW}Mengunduh file backup...${NC}"
+    
+    # Buat direktori temp
+    TEMP_DIR="/tmp/zivpn_restore_$$"
+    mkdir -p "$TEMP_DIR"
+    mkdir -p "$TEMP_DIR/extract"
+    
+    # Download file
+    FILENAME=$(basename "$backup_url")
+    
+    # Tampilkan progress download
+    if wget --timeout=30 --tries=3 -q --show-progress "$backup_url" -O "$TEMP_DIR/$FILENAME"; then
+        echo -e "${GREEN}[✓] File berhasil diunduh: $FILENAME${NC}"
+        
+        # Cek ukuran file
+        FILE_SIZE=$(du -h "$TEMP_DIR/$FILENAME" | cut -f1)
+        echo -e "     Ukuran: ${CYAN}$FILE_SIZE${NC}"
+        
+        # Cek tipe file berdasarkan ekstensi
+        if [[ "$FILENAME" == *.zip ]]; then
+            # Unzip file
+            echo -e "${YELLOW}Mengekstrak file ZIP...${NC}"
+            if unzip -q "$TEMP_DIR/$FILENAME" -d "$TEMP_DIR/extract"; then
+                echo -e "${GREEN}[✓] Ekstraksi ZIP berhasil${NC}"
+            else
+                echo -e "${RED}[✗] Gagal mengekstrak file ZIP!${NC}"
+                rm -rf "$TEMP_DIR"
+                sleep 2
+                return
+            fi
+            
+        elif [[ "$FILENAME" == *.tar.gz ]] || [[ "$FILENAME" == *.tgz ]]; then
+            # Extract tar.gz
+            echo -e "${YELLOW}Mengekstrak file TAR.GZ...${NC}"
+            if tar -xzf "$TEMP_DIR/$FILENAME" -C "$TEMP_DIR/extract" 2>/dev/null; then
+                echo -e "${GREEN}[✓] Ekstraksi TAR.GZ berhasil${NC}"
+            else
+                echo -e "${RED}[✗] Gagal mengekstrak file TAR.GZ!${NC}"
+                rm -rf "$TEMP_DIR"
+                sleep 2
+                return
+            fi
+            
+        else
+            echo -e "${RED}[✗] Format file tidak didukung! Gunakan .zip atau .tar.gz${NC}"
+            echo -e "${YELLOW}File yang didownload: $FILENAME${NC}"
+            rm -rf "$TEMP_DIR"
+            sleep 2
+            return
+        fi
+        
+        # Cari file konfigurasi di dalam hasil extract
+        echo -e "${YELLOW}Mencari file konfigurasi...${NC}"
+        
+        # Cek beberapa kemungkinan lokasi
+        if [ -f "$TEMP_DIR/extract/users.db.json" ]; then
+            CONFIG_PATH="$TEMP_DIR/extract"
+            echo -e "${GREEN}[✓] File users.db.json ditemukan${NC}"
+            
+        elif [ -f "$TEMP_DIR/extract/etc/zivpn/users.db.json" ]; then
+            CONFIG_PATH="$TEMP_DIR/extract/etc/zivpn"
+            echo -e "${GREEN}[✓] File users.db.json ditemukan di folder etc/zivpn${NC}"
+            
+        else
+            # Cari dengan find (rekursif)
+            FOUND_FILE=$(find "$TEMP_DIR/extract" -name "users.db.json" -type f | head -1)
+            if [ -n "$FOUND_FILE" ]; then
+                CONFIG_PATH=$(dirname "$FOUND_FILE")
+                echo -e "${GREEN}[✓] File users.db.json ditemukan di: $CONFIG_PATH${NC}"
+            else
+                echo -e "${RED}[✗] File users.db.json tidak ditemukan dalam backup!${NC}"
+                echo -e "${YELLOW}Isi direktori backup:${NC}"
+                ls -la "$TEMP_DIR/extract"
+                rm -rf "$TEMP_DIR"
+                sleep 3
+                return
+            fi
+        fi
+        
+        # Tampilkan info backup
+        echo ""
+        echo -e "${WHITE}Informasi Backup:${NC}"
+        
+        # Cek file domain
+        if [ -f "$CONFIG_PATH/domain.txt" ]; then
+            BACKUP_DOMAIN=$(cat "$CONFIG_PATH/domain.txt")
+            echo -e "  ${WHITE}Domain Backup:${NC} $BACKUP_DOMAIN"
+        fi
+        
+        # Hitung jumlah akun
+        if [ -f "$CONFIG_PATH/users.db.json" ]; then
+            JUMLAH_AKUN=$(jq length "$CONFIG_PATH/users.db.json" 2>/dev/null || echo "0")
+            echo -e "  ${WHITE}Jumlah Akun  :${NC} $JUMLAH_AKUN"
+        fi
+        
+        # Tampilkan daftar file
+        echo -e "  ${WHITE}File penting :${NC}"
+        ls -la "$CONFIG_PATH" | grep -E "users.db.json|config.json|domain.txt" | awk '{print "    " $9}'
+        
+        echo ""
+        echo -e "${YELLOW}PERINGATAN: Restore akan menimpa semua data saat ini!${NC}"
+        read -p "Yakin ingin melanjutkan restore? (y/N): " confirm
+        
+        if [[ "$confirm" =~ ^[Yy]$ ]]; then
+            echo ""
+            echo -e "${YELLOW}Melakukan restore...${NC}"
+            
+            # Backup data lama (opsional)
+            BACKUP_LAMA="$ZIVPN_DIR/backup/sebelum_restore_$(date +%Y%m%d_%H%M%S).tar.gz"
+            echo -e "${WHITE}Membuat backup data lama:${NC} $(basename "$BACKUP_LAMA")"
+            tar -czf "$BACKUP_LAMA" -C "$ZIVPN_DIR" --exclude="backup" . 2>/dev/null
+            
+            # Copy file dari backup ke direktori ZIVPN
+            cp -rf "$CONFIG_PATH"/* "$ZIVPN_DIR/" 2>/dev/null
+            cp -rf "$CONFIG_PATH"/.[!.]* "$ZIVPN_DIR/" 2>/dev/null
+            
+            if [ $? -eq 0 ]; then
+                echo -e "${GREEN}[✓] Restore berhasil!${NC}"
+                
+                # Restart service
+                echo -e "${WHITE}Merestart service...${NC}"
+                systemctl restart zivpn.service > /dev/null 2>&1
+                systemctl restart udp-custom.service > /dev/null 2>&1
+                echo -e "${GREEN}[✓] Service direstart${NC}"
+                
+                # Kirim notifikasi ke Telegram
+                if [ -f "$BOT_CONFIG" ]; then
+                    source "$BOT_CONFIG"
+                    if [ -n "$BOT_TOKEN" ] && [ -n "$CHAT_ID" ]; then
+                        IP=$(curl -s ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
+                        DOMAIN=$(cat "$DOMAIN_FILE" 2>/dev/null || echo "Not set")
+                        
+                        message="🔄 <b>RESTORE DARI LINK</b>%0A"
+                        message+="════════════════════════════════%0A"
+                        message+="<b>Waktu</b>   : $(date +'%Y-%m-%d %H:%M:%S')%0A"
+                        message+="<b>IP</b>      : $IP%0A"
+                        message+="<b>Domain</b>  : $DOMAIN%0A"
+                        message+="<b>Sumber</b>  : $backup_url%0A"
+                        message+="════════════════════════════════%0A"
+                        
+                        curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+                             -d "chat_id=${CHAT_ID}" \
+                             -d "text=${message}" \
+                             -d "parse_mode=HTML" > /dev/null
+                    fi
+                fi
+            else
+                echo -e "${RED}[✗] Gagal melakukan restore!${NC}"
+            fi
+        else
+            echo -e "${YELLOW}Restore dibatalkan${NC}"
+        fi
+        
+        # Bersihkan temporary files
+        echo -e "${WHITE}Membersihkan file temporary...${NC}"
+        rm -rf "$TEMP_DIR"
+        echo -e "${GREEN}[✓] Selesai${NC}"
+        
+    else
+        echo -e "${RED}[✗] Gagal mengunduh file!${NC}"
+        echo -e "${YELLOW}Periksa koneksi internet dan pastikan URL valid${NC}"
+        rm -rf "$TEMP_DIR"
+    fi
+    
+    echo ""
+    read -p "Press Enter untuk kembali..."
+}
 # === FUNGSI LIHAT DAFTAR BACKUP ===
 backup_list() {
     show_header
