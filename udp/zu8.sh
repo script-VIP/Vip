@@ -105,7 +105,8 @@ show_menu() {
     echo -e "  ${YELLOW}[08]${NC} 💾  Backup & Restore"
     echo -e "  ${YELLOW}[09]${NC} 🌐  Change Domain"
     echo -e "  ${YELLOW}[10]${NC} 🔄  Restart Service ZIVPN"
-    echo -e "  ${YELLOW}[11]${NC} ❌  Uninstall ZIVPN"
+    echo -e "  ${YELLOW}[11]${NC} ✅  install ZIVPN"
+    echo -e "  ${YELLOW}[12]${NC} ❌  Uninstall ZIVPN"
     echo -e "  ${YELLOW}[00]${NC} 🚪  Exit"
     echo ""
     echo -e "${BLUE}════════════════════════════════════════════════════════════════${NC}"
@@ -250,22 +251,22 @@ add_account() {
        }]' "$USERS_DB_JSON" > "$USERS_DB_JSON.tmp" 2>/dev/null && mv "$USERS_DB_JSON.tmp" "$USERS_DB_JSON"
     
     clear
-    echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${GREEN}═════════════════════════${NC}"
     echo -e "${GREEN}        ✓ Terima kasih sudah order kak😁${NC}"
-    echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${GREEN}═════════════════════════${NC}"
     echo -e "${WHITE}                       ZIVPN UDP${NC}"
-    echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${GREEN}═════════════════════════${NC}"
     echo -e "  ${WHITE}Domain      :${NC} $DOMAIN"
     echo -e "  ${WHITE}Password    :${NC} ${GREEN}$password${NC}"
     echo -e "  ${WHITE}Lokasi      :${NC} $LOKASI"
-    echo -e "  ${WHITE}────────────────────────────────────────────${NC}"
+    echo -e "  ${WHITE}─────────────────────────${NC}"
     echo -e "  ${WHITE}Tanggal Buat:${NC} $create_date"
     echo -e "  ${WHITE}Tanggal Exp :${NC} $expiry_date"
     echo -e "  ${WHITE}Masa Aktif  :${NC} $duration hari"
     echo -e "  ${WHITE}Limit IP    :${NC} $limit_ip device"
-    echo -e "${GREEN}────────────────────────────────────────────────────────────────${NC}"
+    echo -e "${GREEN}──────────────────────────${NC}"
     echo -e "${WHITE}              TUTORIAL ZIVPN APP / UDP TUNNEL${NC}"
-    echo -e "${GREEN}────────────────────────────────────────────────────────────────${NC}"
+    echo -e "${GREEN}──────────────────────────${NC}"
     echo -e "  1. Buka ZIVPN App"
     echo -e "  2. Centang Udp"
     echo -e "  3. Pilih negara bebas (saran $LOKASI)"
@@ -274,7 +275,6 @@ add_account() {
     echo -e "  6. UDP Server  : $DOMAIN"
     echo -e "     UDP Password: $password"
     echo -e "  7. Klik APPLY → START"
-    echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
     
     # Kirim notifikasi Telegram
     message="════════════════════════════════%0A"
@@ -1170,41 +1170,264 @@ set_auto_backup_schedule() {
     /usr/local/bin/zivpn-autobackup.sh
     sleep 2
 }
-
+# === FUNGSI INSTALL ULANG ZIVPN ===
+reinstall_zivpn() {
+    show_header
+    echo -e "${YELLOW}»»» INSTALL ULANG ZIVPN «««${NC}"
+    echo ""
+    echo -e "${WHITE}Service saat ini: ${RED}STOPPED${NC}"
+    echo ""
+    echo "Pilih opsi install ulang:"
+    echo "  1. Install Ulang (Tanpa Hapus Data Pengguna)"
+    echo "  2. Install Ulang + Reset Semua Data"
+    echo "  3. Kembali"
+    echo ""
+    read -p "Pilih [1-3]: " reinstall_choice
+    
+    case $reinstall_choice in
+        1)
+            echo ""
+            echo -e "${YELLOW}Install ulang tanpa menghapus data pengguna...${NC}"
+            
+            # Backup data pengguna
+            echo -e "${WHITE}Membackup data pengguna...${NC}"
+            if [ -f "$USERS_DB_JSON" ]; then
+                cp "$USERS_DB_JSON" "$USERS_DB_JSON.backup"
+                echo -e "${GREEN}[✓] Data pengguna dibackup${NC}"
+            fi
+            
+            # Download ulang binary
+            echo -e "${WHITE}Download ulang binary...${NC}"
+            ARCH=$(uname -m)
+            if [[ "$ARCH" == "x86_64" ]]; then
+                BINARY_URL="https://raw.githubusercontent.com/zivpn/udp-zivpn/main/zivpn-linux-amd64"
+            elif [[ "$ARCH" == "aarch64" ]]; then
+                BINARY_URL="https://raw.githubusercontent.com/zivpn/udp-zivpn/main/zivpn-linux-arm64"
+            else
+                echo -e "${RED}[✗] Arsitektur $ARCH tidak didukung${NC}"
+                return
+            fi
+            
+            wget -O /usr/local/bin/zivpn "$BINARY_URL" -q --show-progress
+            chmod +x /usr/local/bin/zivpn
+            
+            # Restart service
+            systemctl daemon-reload
+            systemctl restart zivpn.service
+            systemctl enable zivpn.service
+            
+            # Restore data pengguna
+            if [ -f "$USERS_DB_JSON.backup" ]; then
+                mv "$USERS_DB_JSON.backup" "$USERS_DB_JSON"
+                echo -e "${GREEN}[✓] Data pengguna direstore${NC}"
+            fi
+            
+            echo -e "${GREEN}[✓] Install ulang selesai${NC}"
+            ;;
+            
+        2)
+            echo ""
+            echo -e "${YELLOW}Install ulang + reset semua data...${NC}"
+            
+            # Backup opsional
+            read -p "Buat backup sebelum reset? (y/N): " backup_first
+            if [[ "$backup_first" =~ ^[Yy]$ ]]; then
+                BACKUP_FILE="$ZIVPN_DIR/backup/reset_backup_$(date +%Y%m%d_%H%M%S).tar.gz"
+                mkdir -p "$ZIVPN_DIR/backup"
+                tar -czf "$BACKUP_FILE" -C "$ZIVPN_DIR" --exclude="backup" . 2>/dev/null
+                echo -e "${GREEN}[✓] Backup dibuat: $(basename "$BACKUP_FILE")${NC}"
+            fi
+            
+            # Hapus data lama
+            echo -e "${WHITE}Menghapus data lama...${NC}"
+            rm -rf "$ZIVPN_DIR"/*
+            rm -f /usr/local/bin/zivpn
+            
+            # Buat direktori baru
+            mkdir -p "$ZIVPN_DIR"
+            mkdir -p "$ZIVPN_DIR/backup"
+            echo "[]" > "$USERS_DB_JSON"
+            
+            # Download binary
+            echo -e "${WHITE}Download binary baru...${NC}"
+            ARCH=$(uname -m)
+            if [[ "$ARCH" == "x86_64" ]]; then
+                BINARY_URL="https://raw.githubusercontent.com/zivpn/udp-zivpn/main/zivpn-linux-amd64"
+            elif [[ "$ARCH" == "aarch64" ]]; then
+                BINARY_URL="https://raw.githubusercontent.com/zivpn/udp-zivpn/main/zivpn-linux-arm64"
+            else
+                echo -e "${RED}[✗] Arsitektur $ARCH tidak didukung${NC}"
+                return
+            fi
+            
+            wget -O /usr/local/bin/zivpn "$BINARY_URL" -q --show-progress
+            chmod +x /usr/local/bin/zivpn
+            
+            # Setup domain
+            read -p "Masukkan domain [Enter pakai IP]: " domain
+            if [ -n "$domain" ]; then
+                echo "$domain" > "$DOMAIN_FILE"
+            else
+                curl -s ifconfig.me > "$DOMAIN_FILE"
+            fi
+            
+            # Generate certificate
+            DOMAIN=$(cat "$DOMAIN_FILE")
+            openssl req -x509 -newkey rsa:2048 -nodes \
+                -keyout "$ZIVPN_DIR/zivpn.key" \
+                -out "$ZIVPN_DIR/zivpn.crt" \
+                -days 3650 \
+                -subj "/C=ID/ST=Jakarta/L=Jakarta/O=ZIVPN/OU=UDP/CN=$DOMAIN" \
+                -sha256 2>/dev/null
+            
+            # Create config
+            cat > "$CONFIG_FILE" << EOF
+{
+    "server": {
+        "host": "0.0.0.0",
+        "port": 80,
+        "port_tls": 443,
+        "protocol": "udp"
+    },
+    "ssl": {
+        "cert": "$ZIVPN_DIR/zivpn.crt",
+        "key": "$ZIVPN_DIR/zivpn.key"
+    },
+    "users": {
+        "max_users": 100,
+        "expired_check_interval": 60
+    },
+    "logs": {
+        "path": "/var/log/zivpn/zivpn.log",
+        "level": "info",
+        "max_size": 100
+    },
+    "api": {
+        "enabled": true,
+        "port": 8080
+    },
+    "auth": {
+        "config": []
+    }
+}
+EOF
+            
+            # Restart service
+            systemctl daemon-reload
+            systemctl restart zivpn.service
+            systemctl enable zivpn.service
+            
+            echo -e "${GREEN}[✓] Install ulang dengan data baru selesai${NC}"
+            ;;
+            
+        3)
+            return
+            ;;
+            
+        *)
+            echo -e "${RED}Pilihan tidak valid!${NC}"
+            sleep 1
+            return
+            ;;
+    esac
+    
+    # Cek status service
+    sleep 2
+    if systemctl is-active --quiet zivpn.service; then
+        echo -e "${GREEN}[✓] Service ZIVPN berjalan dengan baik${NC}"
+    else
+        echo -e "${RED}[✗] Service ZIVPN gagal berjalan, cek log: journalctl -u zivpn.service${NC}"
+    fi
+    
+    echo ""
+    read -p "Press Enter untuk kembali ke menu..."
+}
 # === FUNGSI UNINSTALL ===
 uninstall() {
     show_header
     echo -e "${RED}»»» UNINSTALL ZIVPN «««${NC}"
     echo ""
-    echo -e "${YELLOW}Peringatan: Semua data akan dihapus!${NC}"
+    echo -e "${YELLOW}Peringatan: Ini akan menghapus ZIVPN dari sistem!${NC}"
     echo ""
-    read -p "Yakin ingin uninstall? (y/N): " confirm
+    echo "Pilihan uninstall:"
+    echo "  1. Uninstall (Simpan Data Pengguna)"
+    echo "  2. Uninstall + Hapus Semua Data"
+    echo "  3. Kembali"
+    echo ""
+    read -p "Pilih [1-3]: " uninstall_choice
     
-    if [[ "$confirm" =~ ^[Yy]$ ]]; then
-        echo ""
-        echo -e "${WHITE}Menghentikan services...${NC}"
-        systemctl stop zivpn.service udp-custom.service 2>/dev/null
-        systemctl disable zivpn.service udp-custom.service 2>/dev/null
-        
-        echo -e "${WHITE}Menghapus file...${NC}"
-        rm -f /etc/systemd/system/zivpn.service
-        rm -f /etc/systemd/system/udp-custom.service
-        rm -f /usr/local/bin/zivpn
-        rm -f /usr/local/bin/zivpn-menu
-        rm -f /usr/local/bin/zivpn-autobackup.sh
-        rm -f /etc/cron.d/zivpn-autobackup
-        
-        read -p "Hapus semua data konfigurasi? (y/N): " rm_data
-        if [[ "$rm_data" =~ ^[Yy]$ ]]; then
+    case $uninstall_choice in
+        1)
+            echo ""
+            echo -e "${YELLOW}Uninstall tanpa menghapus data pengguna...${NC}"
+            
+            # Stop services
+            systemctl stop zivpn.service udp-custom.service 2>/dev/null
+            systemctl disable zivpn.service udp-custom.service 2>/dev/null
+            
+            # Remove service files
+            rm -f /etc/systemd/system/zivpn.service
+            rm -f /etc/systemd/system/udp-custom.service
+            
+            # Remove binaries
+            rm -f /usr/local/bin/zivpn
+            rm -f /usr/local/bin/zivpn-autobackup.sh
+            
+            # Remove cron
+            rm -f /etc/cron.d/zivpn-autobackup
+            
+            systemctl daemon-reload
+            
+            echo -e "${GREEN}[✓] Uninstall selesai (data pengguna tetap tersimpan di $ZIVPN_DIR)${NC}"
+            echo -e "${YELLOW}Data pengguna: $USERS_DB_JSON${NC}"
+            ;;
+            
+        2)
+            echo ""
+            echo -e "${YELLOW}Uninstall + hapus semua data...${NC}"
+            
+            # Backup opsional
+            read -p "Buat backup sebelum uninstall? (y/N): " backup_first
+            if [[ "$backup_first" =~ ^[Yy]$ ]]; then
+                BACKUP_FILE="/root/zivpn_final_backup_$(date +%Y%m%d_%H%M%S).tar.gz"
+                tar -czf "$BACKUP_FILE" -C "$ZIVPN_DIR" . 2>/dev/null
+                echo -e "${GREEN}[✓] Backup dibuat: $(basename "$BACKUP_FILE")${NC}"
+            fi
+            
+            # Stop services
+            systemctl stop zivpn.service udp-custom.service 2>/dev/null
+            systemctl disable zivpn.service udp-custom.service 2>/dev/null
+            
+            # Remove all files
+            rm -f /etc/systemd/system/zivpn.service
+            rm -f /etc/systemd/system/udp-custom.service
+            rm -f /usr/local/bin/zivpn
+            rm -f /usr/local/bin/zivpn-menu
+            rm -f /usr/local/bin/zivpn-autobackup.sh
+            rm -f /etc/cron.d/zivpn-autobackup
             rm -rf "$ZIVPN_DIR"
             rm -rf /var/log/zivpn
-            echo -e "${GREEN}[✓] Semua data dihapus${NC}"
-        fi
-        
-        systemctl daemon-reload
-        echo -e "${GREEN}[✓] Uninstall selesai${NC}"
-        exit 0
-    fi
+            
+            systemctl daemon-reload
+            
+            echo -e "${GREEN}[✓] Uninstall selesai, semua data telah dihapus${NC}"
+            echo -e "${YELLOW}Script menu masih tersedia, jalankan 'rm /usr/local/bin/zivpn-menu' untuk menghapus menu${NC}"
+            ;;
+            
+        3)
+            return
+            ;;
+            
+        *)
+            echo -e "${RED}Pilihan tidak valid!${NC}"
+            sleep 1
+            return
+            ;;
+    esac
+    
+    echo ""
+    read -p "Press Enter untuk keluar dari menu..."
+    exit 0
 }
 
 # === FUNGSI AUTO BACKUP SCRIPT ===
@@ -1299,7 +1522,8 @@ while true; do
         08|8) backup_menu ;;
         09|9) change_domain ;;
         10) restart_service ;;
-        11) uninstall ;;
+        11) reinstall_zivpn ;;
+        12) uninstall ;;
         00|0) 
             clear
             echo -e "${GREEN}Terima kasih!${NC}"
