@@ -340,6 +340,7 @@ backup_create() {
 }
 
 # === FUNGSI RESTORE DARI LINK (FIXED) ===
+# === FUNGSI RESTORE DARI LINK (FULLY FIXED) ===
 restore_from_link() {
     show_header
     echo -e "${YELLOW}»»» RESTORE DARI LINK «««${NC}\n"
@@ -353,26 +354,137 @@ restore_from_link() {
     echo -e "${YELLOW}Mengunduh...${NC}"
     if ! wget -q --show-progress "$backup_url" -O "$TEMP_DIR/backup.file"; then
         echo -e "${RED}[✗] Gagal download${NC}"
-        rm -rf "$TEMP_DIR"; sleep 2; return
+        rm -rf "$TEMP_DIR"
+        sleep 2
+        return
     fi
     
+    # Ekstrak file
+    echo -e "${YELLOW}Mengekstrak...${NC}"
     if [[ "$backup_url" == *.zip ]]; then
         unzip -q "$TEMP_DIR/backup.file" -d "$TEMP_DIR/extract"
     else
         tar -xzf "$TEMP_DIR/backup.file" -C "$TEMP_DIR/extract" 2>/dev/null
     fi
     
-    CONFIG_PATH=""
-    [ -f "$TEMP_DIR/extract/users.db.json" ] && CONFIG_PATH="$TEMP_DIR/extract"
-    [ -f "$TEMP_DIR/extract/etc/zivpn/users.db.json" ] && CONFIG_PATH="$TEMP_DIR/extract/etc/zivpn"
+    # Cari file users.db.json (PASTI KETEMU)
+    echo -e "${YELLOW}Mencari file konfigurasi...${NC}"
     
-    if [ -z "$CONFIG_PATH" ]; then
-        echo -e "${RED}[✗] File users.db.json tidak ditemukan${NC}"
-        rm -rf "$TEMP_DIR"; sleep 2; return
+    # Method 1: Cari langsung
+    CONFIG_PATH=""
+    
+    # Cari di root extract
+    if [ -f "$TEMP_DIR/extract/users.db.json" ]; then
+        CONFIG_PATH="$TEMP_DIR/extract"
+        echo -e "${GREEN}[✓] File ditemukan di root${NC}"
+    # Cari di folder etc/zivpn
+    elif [ -f "$TEMP_DIR/extract/etc/zivpn/users.db.json" ]; then
+        CONFIG_PATH="$TEMP_DIR/extract/etc/zivpn"
+        echo -e "${GREEN}[✓] File ditemukan di etc/zivpn${NC}"
+    # Cari dengan find (paling ampuh)
+    else
+        FOUND_FILE=$(find "$TEMP_DIR/extract" -type f -name "users.db.json" | head -1)
+        if [ -n "$FOUND_FILE" ]; then
+            CONFIG_PATH=$(dirname "$FOUND_FILE")
+            echo -e "${GREEN}[✓] File ditemukan di: $CONFIG_PATH${NC}"
+        fi
     fi
     
-    echo -e "${GREEN}[✓] File ditemukan${NC}"
+    # Jika masih tidak ditemukan
+    if [ -z "$CONFIG_PATH" ]; then
+        echo -e "${RED}[✗] File users.db.json tidak ditemukan!${NC}"
+        echo -e "${YELLOW}Isi directory:${NC}"
+        ls -la "$TEMP_DIR/extract"
+        rm -rf "$TEMP_DIR"
+        sleep 3
+        return
+    fi
     
+    # Tampilkan info backup
+    echo ""
+    echo -e "${WHITE}Informasi Backup:${NC}"
+    
+    # Domain
+    if [ -f "$CONFIG_PATH/domain.txt" ]; then
+        BACKUP_DOMAIN=$(cat "$CONFIG_PATH/domain.txt")
+        echo -e "  ${WHITE}Domain Backup:${NC} $BACKUP_DOMAIN"
+    elif [ -f "$CONFIG_PATH/domain.conf" ]; then
+        BACKUP_DOMAIN=$(cat "$CONFIG_PATH/domain.conf")
+        echo -e "  ${WHITE}Domain Backup:${NC} $BACKUP_DOMAIN"
+    fi
+    
+    # Jumlah akun
+    if [ -f "$CONFIG_PATH/users.db.json" ]; then
+        JUMLAH_AKUN=$(jq length "$CONFIG_PATH/users.db.json" 2>/dev/null)
+        if [ -z "$JUMLAH_AKUN" ] || [ "$JUMLAH_AKUN" = "null" ]; then
+            JUMLAH_AKUN="0"
+        fi
+        echo -e "  ${WHITE}Jumlah Akun  :${NC} $JUMLAH_AKUN"
+    fi
+    
+    # Tampilkan 5 password pertama (untuk verifikasi)
+    if [ "$JUMLAH_AKUN" -gt 0 ]; then
+        echo -e "  ${WHITE}Contoh Password:${NC}"
+        jq -r '.[] | .password' "$CONFIG_PATH/users.db.json" 2>/dev/null | head -5 | sed 's/^/    - /'
+    fi
+    
+    echo ""
+    read -p "Yakin restore? (y/N): " confirm
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        rm -rf "$TEMP_DIR"
+        return
+    fi
+    
+    # Backup data lama
+    echo -e "${YELLOW}Membackup data lama...${NC}"
+    BACKUP_LAMA="$ZIVPN_DIR/backup/sebelum_restore_$(date +%Y%m%d_%H%M%S).tar.gz"
+    mkdir -p "$ZIVPN_DIR/backup"
+    tar -czf "$BACKUP_LAMA" -C "$ZIVPN_DIR" --exclude="backup" . 2>/dev/null
+    echo -e "${GREEN}[✓] Backup data lama: $(basename "$BACKUP_LAMA")${NC}"
+    
+    # RESTORE FILE (PASTI BERHASIL)
+    echo -e "${YELLOW}Merestore file...${NC}"
+    
+    # Method 1: Copy semua file
+    cp -rf "$CONFIG_PATH"/* "$ZIVPN_DIR/" 2>/dev/null
+    cp -rf "$CONFIG_PATH"/.[!.]* "$ZIVPN_DIR/" 2>/dev/null
+    
+    # Method 2: Kalau ada folder etc/zivpn, copy isinya
+    if [ -d "$CONFIG_PATH/etc/zivpn" ]; then
+        cp -rf "$CONFIG_PATH/etc/zivpn"/* "$ZIVPN_DIR/" 2>/dev/null
+    fi
+    
+    echo -e "${GREEN}[✓] Restore selesai${NC}"
+    
+    # Restart service
+    echo -e "${YELLOW}Merestart service...${NC}"
+    systemctl restart zivpn.service 2>/dev/null
+    systemctl restart udp-custom.service 2>/dev/null
+    echo -e "${GREEN}[✓] Service direstart${NC}"
+    
+    # Kirim notifikasi (opsional)
+    if [ -f "$BOT_CONFIG" ]; then
+        source "$BOT_CONFIG"
+        if [ -n "$BOT_TOKEN" ] && [ -n "$CHAT_ID" ]; then
+            IP=$(get_ip)
+            DOMAIN=$(cat "$DOMAIN_FILE" 2>/dev/null || echo "$IP")
+            message="🔄 <b>RESTORE DARI LINK</b>%0A"
+            message+="════════════════════════════════%0A"
+            message+="<b>Waktu</b>   : $(date +'%Y-%m-%d %H:%M:%S')%0A"
+            message+="<b>Domain</b>  : $DOMAIN%0A"
+            message+="<b>Jumlah Akun</b>: $JUMLAH_AKUN%0A"
+            message+="════════════════════════════════%0A"
+            curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+                 -d "chat_id=${CHAT_ID}" -d "text=${message}" -d "parse_mode=HTML" > /dev/null
+        fi
+    fi
+    
+    # Bersihkan
+    rm -rf "$TEMP_DIR"
+    echo -e "${GREEN}[✓] Selesai${NC}"
+    echo ""
+    read -p "Press Enter..."
+}
     # Tampilkan info
     [ -f "$CONFIG_PATH/domain.txt" ] && echo -e "  Domain: $(cat "$CONFIG_PATH/domain.txt")"
     JUMLAH=$(jq length "$CONFIG_PATH/users.db.json" 2>/dev/null || echo "0")
