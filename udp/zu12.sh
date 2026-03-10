@@ -520,7 +520,7 @@ backup_list() {
 }
 
 # === FUNGSI BACKUP RESTORE FILE ===
-backup_restore() {
+restore_from_link() {
     show_header
     echo -e "${YELLOW}»»» RESTORE DARI FILE «««${NC}\n"
     
