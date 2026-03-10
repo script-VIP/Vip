@@ -657,7 +657,7 @@ backup_menu() {
             1) backup_create ;;
             2) backup_list ;;
             3) backup_restore ;;
-            4) restore_from_link
+            4) restore_from_link ;;
             5) config_bot ;;
             6) auto_backup_settings ;;
             7) return ;;
