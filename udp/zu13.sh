@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================
-#   ZIVPN UDP MANAGER - FIXED COMPLETE EDITION
+#   ZIVPN UDP MANAGER - FULL FIXED VERSION
 #   By: Custom Script
 #   OS: Ubuntu 20.04/22.04/24.04
 # =============================================
@@ -13,14 +13,9 @@ DOMAIN_FILE="$ZIVPN_DIR/domain.txt"
 BOT_CONFIG="$ZIVPN_DIR/bot_config.sh"
 
 # === WARNA ===
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-WHITE='\033[1;37m'
-PURPLE='\033[0;35m'
-NC='\033[0m'
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
+BLUE='\033[0;34m'; CYAN='\033[0;36m'; WHITE='\033[1;37m'
+PURPLE='\033[0;35m'; NC='\033[0m'
 
 # === FUNGSI GET IP ===
 get_ip() {
@@ -49,7 +44,12 @@ get_vps_info() {
         RAM_INFO="N/A"
     fi
     
-    [ -f "$USERS_DB_JSON" ] && TOTAL_AKUN=$(jq length "$USERS_DB_JSON" 2>/dev/null || echo "0") || TOTAL_AKUN="0"
+    if [ -f "$USERS_DB_JSON" ]; then
+        TOTAL_AKUN=$(jq length "$USERS_DB_JSON" 2>/dev/null || echo "0")
+    else
+        TOTAL_AKUN="0"
+        echo "[]" > "$USERS_DB_JSON"
+    fi
     
     if systemctl is-active --quiet zivpn.service 2>/dev/null; then
         SERVICE_STATUS="${GREEN}Running${NC}"
@@ -63,7 +63,7 @@ show_header() {
     get_vps_info
     clear
     echo -e "${BLUE}╔══════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║              ZIVPN UDP MANAGER - FIXED EDITION              ║${NC}"
+    echo -e "${BLUE}║              ZIVPN UDP MANAGER - FULL FIXED                 ║${NC}"
     echo -e "${BLUE}╚══════════════════════════════════════════════════════════════╝${NC}"
     echo ""
     echo -e "  ${WHITE}🌍 Public IP    :${NC} ${GREEN}$IP${NC}"
@@ -114,7 +114,7 @@ send_notification() {
          -d "chat_id=${CHAT_ID}" -d "text=${message}" -d "parse_mode=HTML" > /dev/null
 }
 
-# === FUNGSI TAMBAH AKUN ===
+# === FUNGSI TAMBAH AKUN REGULER ===
 add_account() {
     show_header
     echo -e "${YELLOW}»»» TAMBAH AKUN REGULER «««${NC}\n"
@@ -136,7 +136,7 @@ add_account() {
     create_date=$(date +"%d %b, %Y")
     expiry_date=$(date -d "@$expiry_timestamp" +"%d %b, %Y")
     
-    [ -f "$DOMAIN_FILE" ] && DOMAIN=$(cat "$DOMAIN_FILE") || DOMAIN=$(get_ip)
+    DOMAIN=$(cat "$DOMAIN_FILE" 2>/dev/null || get_ip)
     
     jq --arg user "$username" --arg pass "$password" --argjson expiry "$expiry_timestamp" \
        --arg limit "$limit_ip" --arg created "$create_date" \
@@ -181,7 +181,7 @@ add_trial() {
     create_date=$(date +"%d %b, %Y %H:%M")
     expiry_date=$(date -d "@$expiry_timestamp" +"%d %b, %Y %H:%M")
     
-    [ -f "$DOMAIN_FILE" ] && DOMAIN=$(cat "$DOMAIN_FILE") || DOMAIN=$(get_ip)
+    DOMAIN=$(cat "$DOMAIN_FILE" 2>/dev/null || get_ip)
     
     jq --arg user "$username" --arg pass "$password" --argjson expiry "$expiry_timestamp" \
        '. += [{
@@ -198,6 +198,7 @@ add_trial() {
     echo -e "  ${WHITE}────────────────────────────────────────────${NC}"
     echo -e "  ${WHITE}Dibuat      :${NC} $create_date"
     echo -e "  ${WHITE}Expired     :${NC} $expiry_date"
+    echo -e "  ${WHITE}Masa Aktif  :${NC} $duration menit"
     echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
     
     sync_config
@@ -244,7 +245,11 @@ delete_account() {
     echo -e "${YELLOW}»»» HAPUS AKUN «««${NC}\n"
     
     TOTAL=$(jq length "$USERS_DB_JSON" 2>/dev/null || echo "0")
-    [ "$TOTAL" -eq 0 ] && { echo -e "${RED}Belum ada akun${NC}"; sleep 2; return; }
+    if [ "$TOTAL" -eq 0 ]; then
+        echo -e "${RED}Belum ada akun${NC}"
+        sleep 2
+        return
+    fi
     
     echo -e "${WHITE}Daftar Password:${NC}"
     for i in $(seq 0 $((TOTAL-1))); do
@@ -260,6 +265,48 @@ delete_account() {
     echo -e "${GREEN}[✓] Akun dihapus${NC}"
     sync_config
     sleep 2
+}
+
+# === FUNGSI EDIT MASA AKTIF ===
+edit_expiry() {
+    show_header
+    echo -e "${YELLOW}»»» EDIT MASA AKTIF «««${NC}\n"
+    read -p "Password: " pass
+    current=$(jq -r --arg p "$pass" '.[] | select(.password == $p) | .expiry_timestamp' "$USERS_DB_JSON" 2>/dev/null)
+    [ -z "$current" ] && { echo -e "${RED}Password tidak ditemukan${NC}"; sleep 2; return; }
+    echo -e "Expired saat ini: $(date -d "@$current" +"%d %b %Y")"
+    read -p "Tambahan hari: " days
+    [ -z "$days" ] && { echo "Batal"; sleep 2; return; }
+    new=$((current + days * 86400))
+    jq --arg p "$pass" --argjson n "$new" '(.[] | select(.password == $p) | .expiry_timestamp) = $n' "$USERS_DB_JSON" > tmp && mv tmp "$USERS_DB_JSON"
+    echo -e "${GREEN}[✓] Diperpanjang $days hari${NC}"
+    sync_config
+    sleep 2
+}
+
+# === FUNGSI EDIT PASSWORD ===
+edit_password() {
+    show_header
+    echo -e "${YELLOW}»»» EDIT PASSWORD «««${NC}\n"
+    read -p "Password lama: " old
+    jq -e --arg o "$old" '.[] | select(.password == $o)' "$USERS_DB_JSON" > /dev/null 2>&1 || { echo -e "${RED}Tidak ditemukan${NC}"; sleep 2; return; }
+    read -p "Password baru: " new
+    jq --arg o "$old" --arg n "$new" '(.[] | select(.password == $o) | .password) = $n' "$USERS_DB_JSON" > tmp && mv tmp "$USERS_DB_JSON"
+    echo -e "${GREEN}[✓] Password diubah${NC}"
+    sync_config
+    sleep 2
+}
+
+# === FUNGSI CEK USER ONLINE ===
+check_online() {
+    show_header
+    echo -e "${YELLOW}»»» USER ONLINE «««${NC}\n"
+    if command -v netstat &> /dev/null; then
+        netstat -an 2>/dev/null | grep ESTABLISHED | grep -E ":80|:443" | awk '{print $5}' | cut -d: -f1 | sort | uniq -c | sort -nr | head -10 || echo "Tidak ada koneksi"
+    else
+        echo "netstat tidak tersedia"
+    fi
+    echo ""; read -p "Press Enter..."
 }
 
 # === FUNGSI RESTART SERVICE ===
@@ -279,7 +326,262 @@ change_domain() {
     current=$(cat "$DOMAIN_FILE" 2>/dev/null || get_ip)
     echo -e "${WHITE}Domain saat ini:${NC} $current\n"
     read -p "Domain baru: " new_domain
-    [ -n "$new_domain" ] && echo "$new_domain" > "$DOMAIN_FILE" && echo -e "${GREEN}[✓] Domain diubah${NC}" || echo -e "${RED}[✗] Domain tidak boleh kosong${NC}"
+    if [ -n "$new_domain" ]; then
+        echo "$new_domain" > "$DOMAIN_FILE"
+        echo -e "${GREEN}[✓] Domain diubah${NC}"
+    else
+        echo -e "${RED}[✗] Domain tidak boleh kosong${NC}"
+    fi
+    sleep 2
+}
+
+# === FUNGSI BACKUP CREATE ===
+backup_create() {
+    show_header
+    echo -e "${YELLOW}»»» BUAT BACKUP «««${NC}\n"
+    
+    BACKUP_DIR="$ZIVPN_DIR/backup"
+    mkdir -p "$BACKUP_DIR"
+    
+    DOMAIN_NAME=$(cat "$DOMAIN_FILE" 2>/dev/null | sed 's/\./_/g' || get_ip | sed 's/\./_/g')
+    DATE=$(date +"%Y%m%d_%H%M%S")
+    BACKUP_FILE="$BACKUP_DIR/${DOMAIN_NAME}.${DATE}.tar.gz"
+    
+    tar -czf "$BACKUP_FILE" -C "$ZIVPN_DIR" --exclude="backup" . 2>/dev/null
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}[✓] Backup: $(basename "$BACKUP_FILE")${NC}"
+        # Kirim ke Telegram
+        [ -f "$BOT_CONFIG" ] && source "$BOT_CONFIG"
+        [ -n "$BOT_TOKEN" ] && [ -n "$CHAT_ID" ] && 
+        curl -s -F document=@"$BACKUP_FILE" \
+             -F caption="✅ Backup ZIVPN - $(date +'%Y-%m-%d %H:%M:%S')" \
+             "https://api.telegram.org/bot${BOT_TOKEN}/sendDocument?chat_id=${CHAT_ID}" > /dev/null
+    else
+        echo -e "${RED}[✗] Gagal backup${NC}"
+    fi
+    
+    echo ""; read -p "Press Enter..."
+}
+
+# === FUNGSI BACKUP LIST ===
+backup_list() {
+    show_header
+    echo -e "${YELLOW}»»» DAFTAR BACKUP «««${NC}\n"
+    if [ -d "$ZIVPN_DIR/backup" ]; then
+        ls -lh "$ZIVPN_DIR/backup/" | grep tar.gz || echo "Belum ada backup"
+    else
+        echo "Belum ada backup"
+    fi
+    echo ""; read -p "Press Enter..."
+}
+
+# === FUNGSI BACKUP RESTORE FILE ===
+backup_restore() {
+    show_header
+    echo -e "${YELLOW}»»» RESTORE DARI FILE «««${NC}\n"
+    
+    [ ! -d "$ZIVPN_DIR/backup" ] && { echo "Belum ada backup"; sleep 2; return; }
+    
+    ls "$ZIVPN_DIR/backup/" | grep tar.gz | nl -w2 -s'. '
+    echo ""
+    read -p "Nama file: " filename
+    
+    [ ! -f "$ZIVPN_DIR/backup/$filename" ] && { echo "File tidak ditemukan"; sleep 2; return; }
+    
+    tar -xzf "$ZIVPN_DIR/backup/$filename" -C "$ZIVPN_DIR" 2>/dev/null
+    echo -e "${GREEN}[✓] Restore selesai${NC}"
+    systemctl restart zivpn.service 2>/dev/null
+    sleep 2
+}
+
+# === FUNGSI RESTORE DARI LINK (FULLY FIXED) ===
+restore_from_link() {
+    show_header
+    echo -e "${YELLOW}»»» RESTORE DARI LINK «««${NC}\n"
+    read -p "URL backup: " backup_url
+    
+    [ -z "$backup_url" ] && { echo -e "${RED}[✗] URL kosong${NC}"; sleep 2; return; }
+    
+    TEMP_DIR="/tmp/zivpn_restore_$$"
+    mkdir -p "$TEMP_DIR/extract"
+    
+    echo -e "${YELLOW}Mengunduh...${NC}"
+    if ! wget -q --show-progress "$backup_url" -O "$TEMP_DIR/backup.file"; then
+        echo -e "${RED}[✗] Gagal download${NC}"
+        rm -rf "$TEMP_DIR"
+        sleep 2
+        return
+    fi
+    
+    # Ekstrak file
+    echo -e "${YELLOW}Mengekstrak...${NC}"
+    if [[ "$backup_url" == *.zip ]]; then
+        unzip -q "$TEMP_DIR/backup.file" -d "$TEMP_DIR/extract"
+    else
+        tar -xzf "$TEMP_DIR/backup.file" -C "$TEMP_DIR/extract" 2>/dev/null
+    fi
+    
+    # Cari file users.db.json
+    echo -e "${YELLOW}Mencari file konfigurasi...${NC}"
+    CONFIG_PATH=""
+    
+    # Cari di berbagai lokasi
+    POSSIBLE_PATHS=(
+        "$TEMP_DIR/extract/users.db.json"
+        "$TEMP_DIR/extract/etc/zivpn/users.db.json"
+        "$TEMP_DIR/extract/root/zivpn/users.db.json"
+        "$TEMP_DIR/extract/home/zivpn/users.db.json"
+    )
+    
+    for path in "${POSSIBLE_PATHS[@]}"; do
+        if [ -f "$path" ]; then
+            CONFIG_PATH=$(dirname "$path")
+            echo -e "${GREEN}[✓] File ditemukan di: $CONFIG_PATH${NC}"
+            break
+        fi
+    done
+    
+    # Jika tidak ditemukan, cari dengan find
+    if [ -z "$CONFIG_PATH" ]; then
+        FOUND_FILE=$(find "$TEMP_DIR/extract" -type f -name "users.db.json" 2>/dev/null | head -1)
+        if [ -n "$FOUND_FILE" ]; then
+            CONFIG_PATH=$(dirname "$FOUND_FILE")
+            echo -e "${GREEN}[✓] File ditemukan di: $CONFIG_PATH${NC}"
+        fi
+    fi
+    
+    # Jika masih tidak ditemukan
+    if [ -z "$CONFIG_PATH" ]; then
+        echo -e "${RED}[✗] File users.db.json tidak ditemukan!${NC}"
+        echo -e "${YELLOW}Isi directory:${NC}"
+        ls -la "$TEMP_DIR/extract" | head -20
+        rm -rf "$TEMP_DIR"
+        sleep 3
+        return
+    fi
+    
+    # Tampilkan info backup
+    echo ""
+    echo -e "${WHITE}Informasi Backup:${NC}"
+    
+    # Domain
+    if [ -f "$CONFIG_PATH/domain.txt" ]; then
+        BACKUP_DOMAIN=$(cat "$CONFIG_PATH/domain.txt")
+        echo -e "  ${WHITE}Domain Backup:${NC} $BACKUP_DOMAIN"
+    fi
+    
+    # Jumlah akun
+    JUMLAH_AKUN=$(jq length "$CONFIG_PATH/users.db.json" 2>/dev/null || echo "0")
+    echo -e "  ${WHITE}Jumlah Akun  :${NC} $JUMLAH_AKUN"
+    
+    # Tampilkan contoh password
+    if [ "$JUMLAH_AKUN" -gt 0 ]; then
+        echo -e "  ${WHITE}Contoh Password:${NC}"
+        jq -r '.[] | .password' "$CONFIG_PATH/users.db.json" 2>/dev/null | head -3 | sed 's/^/    - /'
+    fi
+    
+    echo ""
+    read -p "Yakin restore? (y/N): " confirm
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        rm -rf "$TEMP_DIR"
+        return
+    fi
+    
+    # Backup data lama
+    echo -e "${YELLOW}Membackup data lama...${NC}"
+    BACKUP_LAMA="$ZIVPN_DIR/backup/sebelum_restore_$(date +%Y%m%d_%H%M%S).tar.gz"
+    mkdir -p "$ZIVPN_DIR/backup"
+    tar -czf "$BACKUP_LAMA" -C "$ZIVPN_DIR" --exclude="backup" . 2>/dev/null
+    echo -e "${GREEN}[✓] Backup data lama: $(basename "$BACKUP_LAMA")${NC}"
+    
+    # RESTORE FILE
+    echo -e "${YELLOW}Merestore file...${NC}"
+    
+    # Copy semua file dari CONFIG_PATH ke ZIVPN_DIR
+    cp -rf "$CONFIG_PATH"/* "$ZIVPN_DIR/" 2>/dev/null
+    cp -rf "$CONFIG_PATH"/.[!.]* "$ZIVPN_DIR/" 2>/dev/null
+    
+    # Kalau ada folder etc/zivpn, copy isinya
+    if [ -d "$CONFIG_PATH/etc/zivpn" ]; then
+        cp -rf "$CONFIG_PATH/etc/zivpn"/* "$ZIVPN_DIR/" 2>/dev/null
+    fi
+    
+    echo -e "${GREEN}[✓] Restore selesai${NC}"
+    
+    # Restart service
+    echo -e "${YELLOW}Merestart service...${NC}"
+    systemctl restart zivpn.service 2>/dev/null
+    systemctl restart udp-custom.service 2>/dev/null
+    echo -e "${GREEN}[✓] Service direstart${NC}"
+    
+    # Kirim notifikasi
+    if [ -f "$BOT_CONFIG" ]; then
+        source "$BOT_CONFIG"
+        if [ -n "$BOT_TOKEN" ] && [ -n "$CHAT_ID" ]; then
+            IP=$(get_ip)
+            DOMAIN=$(cat "$DOMAIN_FILE" 2>/dev/null || echo "$IP")
+            message="🔄 <b>RESTORE DARI LINK</b>%0A"
+            message+="════════════════════════════════%0A"
+            message+="<b>Waktu</b>   : $(date +'%Y-%m-%d %H:%M:%S')%0A"
+            message+="<b>Domain</b>  : $DOMAIN%0A"
+            message+="<b>Jumlah Akun</b>: $JUMLAH_AKUN%0A"
+            message+="════════════════════════════════%0A"
+            curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+                 -d "chat_id=${CHAT_ID}" -d "text=${message}" -d "parse_mode=HTML" > /dev/null
+        fi
+    fi
+    
+    # Bersihkan
+    rm -rf "$TEMP_DIR"
+    echo -e "${GREEN}[✓] Selesai${NC}"
+    echo ""
+    read -p "Press Enter..."
+}
+
+# === FUNGSI KONFIGURASI BOT ===
+config_bot() {
+    show_header
+    echo -e "${YELLOW}»»» KONFIGURASI BOT «««${NC}\n"
+    
+    [ -f "$BOT_CONFIG" ] && source "$BOT_CONFIG"
+    echo -e "${WHITE}Token:${NC} ${BOT_TOKEN:0:10}... ${WHITE}Chat ID:${NC} $CHAT_ID\n"
+    
+    read -p "Token baru [Enter skip]: " new_token
+    read -p "Chat ID baru [Enter skip]: " new_chat_id
+    
+    [ -n "$new_token" ] && BOT_TOKEN="$new_token"
+    [ -n "$new_chat_id" ] && CHAT_ID="$new_chat_id"
+    
+    cat > "$BOT_CONFIG" << EOF
+#!/bin/bash
+BOT_TOKEN='$BOT_TOKEN'
+CHAT_ID='$CHAT_ID'
+EOF
+    
+    echo -e "${GREEN}[✓] Konfigurasi disimpan${NC}"
+    sleep 2
+}
+
+# === FUNGSI AUTO BACKUP SETTINGS ===
+auto_backup_settings() {
+    show_header
+    echo -e "${YELLOW}»»» AUTO BACKUP «««${NC}\n"
+    
+    if [ -f "/etc/cron.d/zivpn-autobackup" ]; then
+        echo -e "${GREEN}Status: AKTIF${NC}"
+        echo "  1. Nonaktifkan"
+        echo "  2. Backup Sekarang"
+        echo "  3. Kembali"
+        read -p "Pilih: " choice
+        [ "$choice" == "1" ] && rm -f /etc/cron.d/zivpn-autobackup && echo "Auto backup dinonaktifkan"
+        [ "$choice" == "2" ] && /usr/local/bin/zivpn-autobackup.sh
+    else
+        echo -e "${RED}Status: NONAKTIF${NC}"
+        echo "  1. Aktifkan (setiap 6 jam)"
+        read -p "Pilih: " choice
+        [ "$choice" == "1" ] && echo "0 */6 * * * root /usr/local/bin/zivpn-autobackup.sh" > /etc/cron.d/zivpn-autobackup && echo "Auto backup diaktifkan"
+    fi
     sleep 2
 }
 
@@ -309,279 +611,6 @@ backup_menu() {
             *) echo -e "${RED}Pilihan tidak valid${NC}"; sleep 1 ;;
         esac
     done
-}
-
-# === FUNGSI BUAT BACKUP ===
-backup_create() {
-    show_header
-    echo -e "${YELLOW}»»» BUAT BACKUP «««${NC}\n"
-    
-    BACKUP_DIR="$ZIVPN_DIR/backup"
-    mkdir -p "$BACKUP_DIR"
-    
-    [ -f "$DOMAIN_FILE" ] && DOMAIN_NAME=$(cat "$DOMAIN_FILE" | sed 's/\./_/g') || DOMAIN_NAME=$(get_ip | sed 's/\./_/g')
-    DATE=$(date +"%Y%m%d_%H%M%S")
-    BACKUP_FILE="$BACKUP_DIR/${DOMAIN_NAME}.${DATE}.tar.gz"
-    
-    tar -czf "$BACKUP_FILE" -C "$ZIVPN_DIR" --exclude="backup" . 2>/dev/null
-    
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}[✓] Backup: $(basename "$BACKUP_FILE")${NC}"
-        [ -f "$BOT_CONFIG" ] && source "$BOT_CONFIG"
-        [ -n "$BOT_TOKEN" ] && [ -n "$CHAT_ID" ] && 
-        curl -s -F document=@"$BACKUP_FILE" \
-             -F caption="✅ Backup ZIVPN - $(date +'%Y-%m-%d %H:%M:%S')" \
-             "https://api.telegram.org/bot${BOT_TOKEN}/sendDocument?chat_id=${CHAT_ID}" > /dev/null
-    else
-        echo -e "${RED}[✗] Gagal backup${NC}"
-    fi
-    
-    echo ""; read -p "Press Enter..."
-}
-
-# === FUNGSI RESTORE DARI LINK (FIXED) ===
-# === FUNGSI RESTORE DARI LINK (FULLY FIXED) ===
-restore_from_link() {
-    show_header
-    echo -e "${YELLOW}»»» RESTORE DARI LINK «««${NC}\n"
-    read -p "URL backup: " backup_url
-    
-    [ -z "$backup_url" ] && { echo -e "${RED}[✗] URL kosong${NC}"; sleep 2; return; }
-    
-    TEMP_DIR="/tmp/zivpn_restore_$$"
-    mkdir -p "$TEMP_DIR/extract"
-    
-    echo -e "${YELLOW}Mengunduh...${NC}"
-    if ! wget -q --show-progress "$backup_url" -O "$TEMP_DIR/backup.file"; then
-        echo -e "${RED}[✗] Gagal download${NC}"
-        rm -rf "$TEMP_DIR"
-        sleep 2
-        return
-    fi
-    
-    # Ekstrak file
-    echo -e "${YELLOW}Mengekstrak...${NC}"
-    if [[ "$backup_url" == *.zip ]]; then
-        unzip -q "$TEMP_DIR/backup.file" -d "$TEMP_DIR/extract"
-    else
-        tar -xzf "$TEMP_DIR/backup.file" -C "$TEMP_DIR/extract" 2>/dev/null
-    fi
-    
-    # Cari file users.db.json (PASTI KETEMU)
-    echo -e "${YELLOW}Mencari file konfigurasi...${NC}"
-    
-    # Method 1: Cari langsung
-    CONFIG_PATH=""
-    
-    # Cari di root extract
-    if [ -f "$TEMP_DIR/extract/users.db.json" ]; then
-        CONFIG_PATH="$TEMP_DIR/extract"
-        echo -e "${GREEN}[✓] File ditemukan di root${NC}"
-    # Cari di folder etc/zivpn
-    elif [ -f "$TEMP_DIR/extract/etc/zivpn/users.db.json" ]; then
-        CONFIG_PATH="$TEMP_DIR/extract/etc/zivpn"
-        echo -e "${GREEN}[✓] File ditemukan di etc/zivpn${NC}"
-    # Cari dengan find (paling ampuh)
-    else
-        FOUND_FILE=$(find "$TEMP_DIR/extract" -type f -name "users.db.json" | head -1)
-        if [ -n "$FOUND_FILE" ]; then
-            CONFIG_PATH=$(dirname "$FOUND_FILE")
-            echo -e "${GREEN}[✓] File ditemukan di: $CONFIG_PATH${NC}"
-        fi
-    fi
-    
-    # Jika masih tidak ditemukan
-    if [ -z "$CONFIG_PATH" ]; then
-        echo -e "${RED}[✗] File users.db.json tidak ditemukan!${NC}"
-        echo -e "${YELLOW}Isi directory:${NC}"
-        ls -la "$TEMP_DIR/extract"
-        rm -rf "$TEMP_DIR"
-        sleep 3
-        return
-    fi
-    
-    # Tampilkan info backup
-    echo ""
-    echo -e "${WHITE}Informasi Backup:${NC}"
-    
-    # Domain
-    if [ -f "$CONFIG_PATH/domain.txt" ]; then
-        BACKUP_DOMAIN=$(cat "$CONFIG_PATH/domain.txt")
-        echo -e "  ${WHITE}Domain Backup:${NC} $BACKUP_DOMAIN"
-    elif [ -f "$CONFIG_PATH/domain.conf" ]; then
-        BACKUP_DOMAIN=$(cat "$CONFIG_PATH/domain.conf")
-        echo -e "  ${WHITE}Domain Backup:${NC} $BACKUP_DOMAIN"
-    fi
-    
-    # Jumlah akun
-    if [ -f "$CONFIG_PATH/users.db.json" ]; then
-        JUMLAH_AKUN=$(jq length "$CONFIG_PATH/users.db.json" 2>/dev/null)
-        if [ -z "$JUMLAH_AKUN" ] || [ "$JUMLAH_AKUN" = "null" ]; then
-            JUMLAH_AKUN="0"
-        fi
-        echo -e "  ${WHITE}Jumlah Akun  :${NC} $JUMLAH_AKUN"
-    fi
-    
-    # Tampilkan 5 password pertama (untuk verifikasi)
-    if [ "$JUMLAH_AKUN" -gt 0 ]; then
-        echo -e "  ${WHITE}Contoh Password:${NC}"
-        jq -r '.[] | .password' "$CONFIG_PATH/users.db.json" 2>/dev/null | head -5 | sed 's/^/    - /'
-    fi
-    
-    echo ""
-    read -p "Yakin restore? (y/N): " confirm
-    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
-        rm -rf "$TEMP_DIR"
-        return
-    fi
-    
-    # Backup data lama
-    echo -e "${YELLOW}Membackup data lama...${NC}"
-    BACKUP_LAMA="$ZIVPN_DIR/backup/sebelum_restore_$(date +%Y%m%d_%H%M%S).tar.gz"
-    mkdir -p "$ZIVPN_DIR/backup"
-    tar -czf "$BACKUP_LAMA" -C "$ZIVPN_DIR" --exclude="backup" . 2>/dev/null
-    echo -e "${GREEN}[✓] Backup data lama: $(basename "$BACKUP_LAMA")${NC}"
-    
-    # RESTORE FILE (PASTI BERHASIL)
-    echo -e "${YELLOW}Merestore file...${NC}"
-    
-    # Method 1: Copy semua file
-    cp -rf "$CONFIG_PATH"/* "$ZIVPN_DIR/" 2>/dev/null
-    cp -rf "$CONFIG_PATH"/.[!.]* "$ZIVPN_DIR/" 2>/dev/null
-    
-    # Method 2: Kalau ada folder etc/zivpn, copy isinya
-    if [ -d "$CONFIG_PATH/etc/zivpn" ]; then
-        cp -rf "$CONFIG_PATH/etc/zivpn"/* "$ZIVPN_DIR/" 2>/dev/null
-    fi
-    
-    echo -e "${GREEN}[✓] Restore selesai${NC}"
-    
-    # Restart service
-    echo -e "${YELLOW}Merestart service...${NC}"
-    systemctl restart zivpn.service 2>/dev/null
-    systemctl restart udp-custom.service 2>/dev/null
-    echo -e "${GREEN}[✓] Service direstart${NC}"
-    
-    # Kirim notifikasi (opsional)
-    if [ -f "$BOT_CONFIG" ]; then
-        source "$BOT_CONFIG"
-        if [ -n "$BOT_TOKEN" ] && [ -n "$CHAT_ID" ]; then
-            IP=$(get_ip)
-            DOMAIN=$(cat "$DOMAIN_FILE" 2>/dev/null || echo "$IP")
-            message="🔄 <b>RESTORE DARI LINK</b>%0A"
-            message+="════════════════════════════════%0A"
-            message+="<b>Waktu</b>   : $(date +'%Y-%m-%d %H:%M:%S')%0A"
-            message+="<b>Domain</b>  : $DOMAIN%0A"
-            message+="<b>Jumlah Akun</b>: $JUMLAH_AKUN%0A"
-            message+="════════════════════════════════%0A"
-            curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
-                 -d "chat_id=${CHAT_ID}" -d "text=${message}" -d "parse_mode=HTML" > /dev/null
-        fi
-    fi
-    
-    # Bersihkan
-    rm -rf "$TEMP_DIR"
-    echo -e "${GREEN}[✓] Selesai${NC}"
-    echo ""
-    read -p "Press Enter..."
-}
-    # Tampilkan info
-    [ -f "$CONFIG_PATH/domain.txt" ] && echo -e "  Domain: $(cat "$CONFIG_PATH/domain.txt")"
-    JUMLAH=$(jq length "$CONFIG_PATH/users.db.json" 2>/dev/null || echo "0")
-    echo -e "  Jumlah Akun: $JUMLAH"
-    echo ""
-    
-    read -p "Yakin restore? (y/N): " confirm
-    [[ ! "$confirm" =~ ^[Yy]$ ]] && { rm -rf "$TEMP_DIR"; return; }
-    
-    # Backup data lama
-    BACKUP_LAMA="$ZIVPN_DIR/backup/sebelum_restore_$(date +%Y%m%d_%H%M%S).tar.gz"
-    mkdir -p "$ZIVPN_DIR/backup"
-    tar -czf "$BACKUP_LAMA" -C "$ZIVPN_DIR" --exclude="backup" . 2>/dev/null
-    
-    # RESTORE FIX - Gunakan cp dengan loop
-    for file in "$CONFIG_PATH"/*; do
-        [ -f "$file" ] && cp "$file" "$ZIVPN_DIR/"
-    done
-    
-    echo -e "${GREEN}[✓] Restore selesai${NC}"
-    systemctl restart zivpn.service 2>/dev/null
-    rm -rf "$TEMP_DIR"
-    
-    echo ""; read -p "Press Enter..."
-}
-
-# === FUNGSI BACKUP LIST ===
-backup_list() {
-    show_header
-    echo -e "${YELLOW}»»» DAFTAR BACKUP «««${NC}\n"
-    [ -d "$ZIVPN_DIR/backup" ] && ls -lh "$ZIVPN_DIR/backup/" | grep tar.gz || echo "Belum ada backup"
-    echo ""; read -p "Press Enter..."
-}
-
-# === FUNGSI BACKUP RESTORE FILE ===
-restore_from_link() {
-    show_header
-    echo -e "${YELLOW}»»» RESTORE DARI FILE «««${NC}\n"
-    
-    [ ! -d "$ZIVPN_DIR/backup" ] && { echo "Belum ada backup"; sleep 2; return; }
-    
-    ls "$ZIVPN_DIR/backup/" | grep tar.gz | nl -w2 -s'. '
-    echo ""
-    read -p "Nama file: " filename
-    
-    [ ! -f "$ZIVPN_DIR/backup/$filename" ] && { echo "File tidak ditemukan"; sleep 2; return; }
-    
-    tar -xzf "$ZIVPN_DIR/backup/$filename" -C "$ZIVPN_DIR" 2>/dev/null
-    echo -e "${GREEN}[✓] Restore selesai${NC}"
-    systemctl restart zivpn.service 2>/dev/null
-    sleep 2
-}
-
-# === FUNGSI KONFIGURASI BOT ===
-config_bot() {
-    show_header
-    echo -e "${YELLOW}»»» KONFIGURASI BOT «««${NC}\n"
-    
-    [ -f "$BOT_CONFIG" ] && source "$BOT_CONFIG"
-    echo -e "${WHITE}Token:${NC} ${BOT_TOKEN:0:10}... ${WHITE}Chat ID:${NC} $CHAT_ID\n"
-    
-    read -p "Token baru [Enter skip]: " new_token
-    read -p "Chat ID baru [Enter skip]: " new_chat_id
-    
-    [ -n "$new_token" ] && BOT_TOKEN="$new_token"
-    [ -n "$new_chat_id" ] && CHAT_ID="$new_chat_id"
-    
-    cat > "$BOT_CONFIG" << EOF
-#!/bin/bash
-BOT_TOKEN='$BOT_TOKEN'
-CHAT_ID='$CHAT_ID'
-EOF
-    
-    echo -e "${GREEN}[✓] Konfigurasi disimpan${NC}"
-    sleep 2
-}
-
-# === FUNGSI AUTO BACKUP ===
-auto_backup_settings() {
-    show_header
-    echo -e "${YELLOW}»»» AUTO BACKUP «««${NC}\n"
-    
-    if [ -f "/etc/cron.d/zivpn-autobackup" ]; then
-        echo -e "${GREEN}Status: AKTIF${NC}"
-        echo "  1. Nonaktifkan"
-        echo "  2. Backup Sekarang"
-        echo "  3. Kembali"
-        read -p "Pilih: " choice
-        [ "$choice" == "1" ] && rm -f /etc/cron.d/zivpn-autobackup && echo "Auto backup dinonaktifkan"
-        [ "$choice" == "2" ] && /usr/local/bin/zivpn-autobackup.sh
-    else
-        echo -e "${RED}Status: NONAKTIF${NC}"
-        echo "  1. Aktifkan (setiap 6 jam)"
-        read -p "Pilih: " choice
-        [ "$choice" == "1" ] && echo "0 */6 * * * root /usr/local/bin/zivpn-autobackup.sh" > /etc/cron.d/zivpn-autobackup && echo "Auto backup diaktifkan"
-    fi
-    sleep 2
 }
 
 # === FUNGSI INSTALL ULANG ===
@@ -651,44 +680,6 @@ uninstall_zivpn() {
     echo ""; read -p "Press Enter..."
 }
 
-# === FUNGSI CEK ONLINE USER ===
-check_online() {
-    show_header
-    echo -e "${YELLOW}»»» USER ONLINE «««${NC}\n"
-    netstat -an 2>/dev/null | grep ESTABLISHED | grep -E ":80|:443" | awk '{print $5}' | cut -d: -f1 | sort | uniq -c | sort -nr | head -10 || echo "Tidak ada koneksi"
-    echo ""; read -p "Press Enter..."
-}
-
-# === FUNGSI EDIT MASA AKTIF ===
-edit_expiry() {
-    show_header
-    echo -e "${YELLOW}»»» EDIT MASA AKTIF «««${NC}\n"
-    read -p "Password: " pass
-    current=$(jq -r --arg p "$pass" '.[] | select(.password == $p) | .expiry_timestamp' "$USERS_DB_JSON" 2>/dev/null)
-    [ -z "$current" ] && { echo -e "${RED}Password tidak ditemukan${NC}"; sleep 2; return; }
-    echo -e "Expired saat ini: $(date -d "@$current" +"%d %b %Y")"
-    read -p "Tambahan hari: " days
-    [ -z "$days" ] && { echo "Batal"; sleep 2; return; }
-    new=$((current + days * 86400))
-    jq --arg p "$pass" --argjson n "$new" '(.[] | select(.password == $p) | .expiry_timestamp) = $n' "$USERS_DB_JSON" > tmp && mv tmp "$USERS_DB_JSON"
-    echo -e "${GREEN}[✓] Diperpanjang $days hari${NC}"
-    sync_config
-    sleep 2
-}
-
-# === FUNGSI EDIT PASSWORD ===
-edit_password() {
-    show_header
-    echo -e "${YELLOW}»»» EDIT PASSWORD «««${NC}\n"
-    read -p "Password lama: " old
-    jq -e --arg o "$old" '.[] | select(.password == $o)' "$USERS_DB_JSON" > /dev/null 2>&1 || { echo -e "${RED}Tidak ditemukan${NC}"; sleep 2; return; }
-    read -p "Password baru: " new
-    jq --arg o "$old" --arg n "$new" '(.[] | select(.password == $o) | .password) = $n' "$USERS_DB_JSON" > tmp && mv tmp "$USERS_DB_JSON"
-    echo -e "${GREEN}[✓] Password diubah${NC}"
-    sync_config
-    sleep 2
-}
-
 # === FUNGSI AUTO BACKUP SCRIPT ===
 create_autobackup_script() {
     cat > "/usr/local/bin/zivpn-autobackup.sh" << 'EOF'
@@ -698,7 +689,7 @@ BACKUP_DIR="$ZIVPN_DIR/backup"
 DOMAIN_FILE="$ZIVPN_DIR/domain.txt"
 BOT_CONFIG="$ZIVPN_DIR/bot_config.sh"
 mkdir -p "$BACKUP_DIR"
-[ -f "$DOMAIN_FILE" ] && DOMAIN=$(cat "$DOMAIN_FILE" | sed 's/\./_/g') || DOMAIN=$(curl -s ifconfig.me 2>/dev/null | sed 's/\./_/g' || echo "vps")
+DOMAIN=$(cat "$DOMAIN_FILE" 2>/dev/null | sed 's/\./_/g' || curl -s ifconfig.me 2>/dev/null | sed 's/\./_/g' || echo "vps")
 DATE=$(date +"%Y%m%d_%H%M%S")
 BACKUP_FILE="$BACKUP_DIR/${DOMAIN}.${DATE}.tar.gz"
 tar -czf "$BACKUP_FILE" -C "$ZIVPN_DIR" --exclude="backup" . 2>/dev/null
@@ -709,7 +700,7 @@ EOF
     chmod +x "/usr/local/bin/zivpn-autobackup.sh"
 }
 
-# === MAIN ===
+# === MAIN PROGRAM ===
 [ ! -f "$USERS_DB_JSON" ] && echo "[]" > "$USERS_DB_JSON"
 [ ! -f "$DOMAIN_FILE" ] && get_ip > "$DOMAIN_FILE"
 create_autobackup_script
