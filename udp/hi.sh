@@ -1542,7 +1542,8 @@ main_menu() {
             echo -e "  ${CYAN}13${WHITE}. Status Service"
             echo -e "  ${CYAN}14${WHITE}. Restart Service"
             echo -e "  ${GREEN}15${WHITE}. Update Script"
-            echo -e "  ${RED}16${WHITE}. Uninstall ZIVPN"
+            echo -e "  ${RED}16${WHITE}. install ZIVPN"
+            echo -e "  ${RED}17${WHITE}. Uninstall ZIVPN"
             echo -e "  ${RED}0${WHITE}. Keluar"
             echo ""
             echo -e "${WHITE}  ────────────────────────────────────────${NC}"
@@ -1564,7 +1565,8 @@ main_menu() {
                 13) status_service ;;
                 14) restart_service ;;
                 15) update_script ;;
-                16) uninstall_zivpn ;;
+                16) install_zivpn ;;
+                17) uninstall_zivpn ;;
                 0) exit 0 ;;
                 *) echo -e "${RED}Pilihan tidak valid!${NC}"; sleep 1 ;;
             esac
