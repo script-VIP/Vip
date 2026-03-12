@@ -109,6 +109,10 @@ EOF
 send_telegram() {
     local message="$1"
     [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ] && return 1
+    
+    # Ganti \n dengan newline yang benar untuk curl
+    message=$(echo -e "$message")
+    
     curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendMessage" \
         -d chat_id="$CHAT_ID" \
         -d text="$message" \
@@ -133,62 +137,7 @@ hitung_sisa_hari() {
     fi
 }
 
-# === AUTO BACKUP FUNCTION (FORMAT SIAP COPY) ===
-auto_backup() {
-    # Load token
-    source "$TG_FILE" 2>/dev/null
-    
-    local today=$(date +%Y-%m-%d)
-    local today_epoch=$(date +%s)
-    
-    # Header
-    local backup_text="📁 BACKUP ZIVPN EXPRESS\n"
-    backup_text="${backup_text}══════════════════════\n"
-    backup_text="${backup_text}Waktu  : $(date +"%d %B %Y %H:%M")\n"
-    backup_text="${backup_text}Domain : $DOMAIN\n"
-    backup_text="${backup_text}IP     : $(get_ip)\n"
-    backup_text="${backup_text}══════════════════════\n\n"
-    backup_text="${backup_text}DAFTAR USER SISA MASA AKTIF\n\n"
-    
-    local current_limit=""
-    local total_user=0
-    local buffer=""  # Untuk mengumpulkan user per limit
-    
-    while IFS='|' read -r user pass expiry limit; do
-        # Skip expired
-        if [[ "$expiry" != "unlimited" ]]; then
-            local exp_epoch=$(date -d "$expiry" +%s 2>/dev/null)
-            if [[ $exp_epoch -lt $today_epoch ]]; then
-                continue
-            fi
-        fi
-        
-        # Jika limit berubah, tulis buffer sebelumnya dan mulai baru
-        if [[ "$limit" != "$current_limit" ]]; then
-            if [[ -n "$current_limit" ]]; then
-                backup_text="${backup_text}${buffer}\n"
-            fi
-            backup_text="${backup_text}────────────────────\n"
-            backup_text="${backup_text}Limit IP: $limit\n"
-            backup_text="${backup_text}────────────────────\n"
-            current_limit="$limit"
-            buffer=""
-        fi
-        
-        # Hitung sisa hari (dibulatkan ke atas)
-        if [[ "$expiry" == "unlimited" ]]; then
-            user_line="$pass 0"
-        else
-            local sisa_hari=$(hitung_sisa_hari "$expiry")
-            user_line="$pass $sisa_hari"
-        fi
-        
-        # Tambah ke buffer
-        if [[ -z "$buffer" ]]; then
-            buffer="$user_line"
-        else
-            buffer="${buffer}\n${user_line}"
-        fi
+
         ((total_user++))
         
     done < "$DB"
@@ -204,8 +153,61 @@ auto_backup() {
     
     send_telegram "$backup_text"
 }
+    
+# === AUTO BACKUP FUNCTION ===
+auto_backup() {
+    source "$TG_FILE" 2>/dev/null
+    
+    local today_epoch=$(date +%s)
+    
+    # Header
+    local backup_text="📁 BACKUP ZIVPN EXPRESS\n"
+    backup_text="${backup_text}══════════════════════\n"
+    backup_text="${backup_text}Waktu  : $(date +"%d %B %Y %H:%M")\n"
+    backup_text="${backup_text}Domain : $DOMAIN\n"
+    backup_text="${backup_text}IP     : $(get_ip)\n"
+    backup_text="${backup_text}══════════════════════\n\n"
+    backup_text="${backup_text}DAFTAR USER SISA MASA AKTIF\n\n"
+    
+    local current_limit=""
+    local total_user=0
+    
+    while IFS='|' read -r user pass expiry limit; do
+        # Skip expired
+        if [[ "$expiry" != "unlimited" ]]; then
+            local exp_epoch=$(date -d "$expiry" +%s 2>/dev/null)
+            if [[ $exp_epoch -lt $today_epoch ]]; then
+                continue
+            fi
+        fi
+        
+        # Tulis Limit IP jika berubah
+        if [[ "$limit" != "$current_limit" ]]; then
+            backup_text="${backup_text}────────────────────\n"
+            backup_text="${backup_text}Limit IP: $limit\n"
+            backup_text="${backup_text}────────────────────\n"
+            current_limit="$limit"
+        fi
+        
+        # Hitung sisa hari
+        if [[ "$expiry" == "unlimited" ]]; then
+            backup_text="${backup_text}$pass 0\n"
+        else
+            local sisa_hari=$(hitung_sisa_hari "$expiry")
+            backup_text="${backup_text}$pass $sisa_hari\n"
+        fi
+        ((total_user++))
+        
+    done < "$DB"
+    
+    # Footer
+    backup_text="${backup_text}\n══════════════════════\n"
+    backup_text="${backup_text}Total User: $total_user"
+    
+    send_telegram "$backup_text"
+}
 
-# === BACKUP LANGSUNG KE TELEGRAM (FORMAT SIAP COPY) ===
+# === BACKUP LANGSUNG ===
 backup_langsung() {
     clear
     echo -e "${BOLD}${YELLOW}════════════════════════════════════════════════════════${NC}"
@@ -221,7 +223,6 @@ backup_langsung() {
     
     echo -e "${GREEN}Menyiapkan backup...${NC}"
     
-    local today=$(date +%Y-%m-%d)
     local today_epoch=$(date +%s)
     
     # Header
@@ -235,7 +236,6 @@ backup_langsung() {
     
     local current_limit=""
     local total_user=0
-    local buffer=""
     
     while IFS='|' read -r user pass expiry limit; do
         # Skip expired
@@ -246,40 +246,24 @@ backup_langsung() {
             fi
         fi
         
-        # Jika limit berubah, tulis buffer sebelumnya
+        # Tulis Limit IP jika berubah
         if [[ "$limit" != "$current_limit" ]]; then
-            if [[ -n "$current_limit" ]]; then
-                backup_text="${backup_text}${buffer}\n"
-            fi
             backup_text="${backup_text}────────────────────\n"
             backup_text="${backup_text}Limit IP: $limit\n"
             backup_text="${backup_text}────────────────────\n"
             current_limit="$limit"
-            buffer=""
         fi
         
         # Hitung sisa hari
         if [[ "$expiry" == "unlimited" ]]; then
-            user_line="$pass 0"
+            backup_text="${backup_text}$pass 0\n"
         else
             local sisa_hari=$(hitung_sisa_hari "$expiry")
-            user_line="$pass $sisa_hari"
-        fi
-        
-        # Tambah ke buffer
-        if [[ -z "$buffer" ]]; then
-            buffer="$user_line"
-        else
-            buffer="${buffer}\n${user_line}"
+            backup_text="${backup_text}$pass $sisa_hari\n"
         fi
         ((total_user++))
         
     done < "$DB"
-    
-    # Tambah buffer terakhir
-    if [[ -n "$buffer" ]]; then
-        backup_text="${backup_text}${buffer}\n"
-    fi
     
     # Footer
     backup_text="${backup_text}\n══════════════════════\n"
@@ -289,8 +273,6 @@ backup_langsung() {
     send_telegram "$backup_text"
     
     echo -e "${GREEN}✓ Backup terkirim${NC}"
-    echo ""
-    echo -e "${YELLOW}Format backup sudah siap untuk di-copy dan di-create mass${NC}"
     sleep 3
 }
 
