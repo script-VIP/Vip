@@ -105,7 +105,36 @@ EOF
     systemctl restart zivpn.service 2>/dev/null
 }
 
-# === AUTO BACKUP FUNCTION (FORMAT SIAP COPY) ===
+# === FUNGSI TELEGRAM ===
+send_telegram() {
+    local message="$1"
+    [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ] && return 1
+    
+    # Kirim sebagai teks biasa, bukan Markdown
+    curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendMessage" \
+        -d chat_id="$CHAT_ID" \
+        -d text="$message" > /dev/null 2>&1
+}
+
+# === FUNGSI HITUNG SISA HARI (PEMBULATAN KE ATAS) ===
+hitung_sisa_hari() {
+    local expiry="$1"
+    local today_epoch=$(date +%s)
+    local exp_epoch=$(date -d "$expiry" +%s 2>/dev/null)
+    local diff_seconds=$((exp_epoch - today_epoch))
+    local diff_hari=$((diff_seconds / 86400))
+    local sisa_jam=$(( (diff_seconds % 86400) / 3600 ))
+    local sisa_menit=$(( (diff_seconds % 3600) / 60 ))
+    
+    # Pembulatan ke atas jika ada sisa jam atau menit
+    if [[ $sisa_jam -gt 0 ]] || [[ $sisa_menit -gt 0 ]]; then
+        echo $((diff_hari + 1))
+    else
+        echo $diff_hari
+    fi
+}
+
+# === AUTO BACKUP FUNCTION ===
 auto_backup() {
     # Load token
     source "$TG_FILE" 2>/dev/null
@@ -158,7 +187,6 @@ auto_backup() {
     
     send_telegram "$backup_text"
 }
-
 
 # === BACKUP LANGSUNG ===
 backup_langsung() {
@@ -241,7 +269,7 @@ setup_autobackup() {
     local cron_exists=$(crontab -l 2>/dev/null | grep -c "zivex.sh.*--autobackup")
     
     if [[ $cron_exists -gt 0 ]]; then
-        local jadwal=$(crontab -l | grep "zivex.sh.*--autobackup" | head -1 | awk '{print "Jam " $2 ":00"}')
+        local jadwal=$(crontab -l | grep "zivex.sh.*--autobackup" | head -1)
         echo -e "${GREEN}Status: AKTIF${NC}"
         echo -e "Jadwal: ${YELLOW}$jadwal${NC}"
         echo ""
@@ -331,8 +359,6 @@ setup_autobackup() {
     fi
 }
 
-
-
 # === GANTI TOKEN ===
 ganti_token() {
     clear
@@ -366,7 +392,7 @@ EOF
     
     # Test kirim
     echo -e "${YELLOW}Mengirim pesan test...${NC}"
-    send_telegram "✅ *Token Updated*\nZIVPN Express berhasil terhubung!"
+    send_telegram "✅ Token Updated - ZIVPN Express berhasil terhubung!"
     sleep 2
 }
 
@@ -413,7 +439,7 @@ restore_dari_file() {
     echo -e "${WHITE}────────────────────────────────────────────────────${NC}"
     
     while IFS= read -r line || [[ -n "$line" ]]; do
-        # Skip baris yang bukan data user (header, garis, dll)
+        # Skip baris yang bukan data user
         if [[ "$line" =~ ^📁 ]] || [[ "$line" =~ ^════ ]] || [[ "$line" =~ ^Waktu ]] || [[ "$line" =~ ^Domain ]] || [[ "$line" =~ ^IP ]] || [[ "$line" =~ ^DAFTAR ]] || [[ "$line" =~ ^──────────────────── ]] || [[ "$line" =~ ^Total ]] || [[ -z "$line" ]]; then
             continue
         fi
@@ -472,18 +498,6 @@ restore_dari_file() {
         echo -e "  Dilewati: $skipped user"
         echo -e "  Gagal   : $failed user"
         echo ""
-        
-        # Kirim notifikasi
-        local list=""
-        for item in "${created_list[@]}"; do
-            IFS='|' read -r name pass days <<< "$item"
-            list="$list\n- $name : \`$pass\` $days hari"
-        done
-        
-        send_telegram "🔄 *RESTORE DARI FILE*
-Berhasil: $restored user
-Dilewati: $skipped user
-Daftar Baru:$list"
     fi
     
     press_enter
@@ -588,10 +602,6 @@ restore_dari_link() {
         echo -e "  Berhasil: $restored user"
         echo -e "  Dilewati: $skipped user"
         echo -e "  Gagal   : $failed user"
-        
-        send_telegram "🔄 *RESTORE DARI LINK*
-Berhasil: $restored user
-Dilewati: $skipped user"
     fi
     
     rm -f "$file_path"
@@ -706,10 +716,6 @@ restore_dari_telegram() {
         echo -e "  Berhasil: $restored user"
         echo -e "  Dilewati: $skipped user"
         echo -e "  Gagal   : $failed user"
-        
-        send_telegram "🔄 *RESTORE DARI TELEGRAM*
-Berhasil: $restored user
-Dilewati: $skipped user"
     fi
     
     rm -f "$file_path"
@@ -741,7 +747,7 @@ banner() {
         echo -e "  ${WHITE}IP       :${NC} ${CYAN}$ip${NC}"
         echo -e "  ${WHITE}Domain   :${NC} ${CYAN}$DOMAIN${NC}"
         echo -e "  ${WHITE}Total User:${NC} ${GREEN}$total_user${NC}"
-        #echo -e "  ${WHITE}Online   :${NC} ${GREEN}$online${NC} koneksi"
+        echo -e "  ${WHITE}Online   :${NC} ${GREEN}$online${NC} koneksi"
     fi
     echo -e "${WHITE}  ════════════════════════════════════════════${NC}"
     echo ""
@@ -804,9 +810,9 @@ create_account() {
     # Tampilkan hasil
     echo ""
     echo -e "${GREEN}✓ Terima kasih sudah order kak😁${NC}"
-    echo -e "${WHITE}═════════════════════════${NC}"
+    echo -e "${WHITE}════════════════════════════════════════════════════════${NC}"
     echo -e "  ${CYAN}ZIVPN EXPRESS${NC}"
-    echo -e "${WHITE}─────────────────────────${NC}"
+    echo -e "${WHITE}────────────────────────────────────────────────────${NC}"
     
     if [[ "$DOMAIN" != "-" ]]; then
         echo -e "  Domain      : ${CYAN}$DOMAIN${NC}"
@@ -816,13 +822,13 @@ create_account() {
     echo -e "  Password    : ${YELLOW}$PASSWORD${NC}"
     echo -e "  Limit IP    : ${PURPLE}$([ "$LIMIT" == "0" ] && echo "Unlimited" || echo "$LIMIT Device")${NC}"
     echo -e "  Server      : ${CYAN}$LOKASI${NC}"
-    #echo -e "${WHITE}────────────────────────${NC}"
+    echo -e "${WHITE}────────────────────────────────────────────────────${NC}"
     echo -e "  Tanggal Buat: ${GREEN}$CREATE_DATE${NC}"
     echo -e "  Tanggal Exp : ${YELLOW}$EXP_DATE${NC}"
     echo -e "  Masa Aktif  : ${YELLOW}$DAYS hari${NC}"
-    echo -e "${WHITE}─────────────────────────${NC}"
+    echo -e "${WHITE}────────────────────────────────────────────────────${NC}"
     echo -e "  ${YELLOW}Tutorial ZIVPN APP${NC}"
-    echo -e "${WHITE}─────────────────────────${NC}"
+    echo -e "${WHITE}────────────────────────────────────────────────────${NC}"
     echo -e "  1. Buka ZIVPN App"
     echo -e "  2. Centang Udp"
     echo -e "  3. Klik Garis tiga pojok kiri atas"
@@ -834,15 +840,11 @@ create_account() {
         echo -e "  5. UDP Server  : ${CYAN}$(get_ip)${NC}"
     fi
     echo -e "     UDP Password: ${CYAN}$PASSWORD${NC}"
-    echo -e "  6. Pilih negara bebas. opsi $LOKASI"
+    echo -e "  6. Pilih negara bebas rekom $LOKASI"
     echo -e "  7. Klik APPLY → START"
-    #echo -e "${WHITE}══════════════════════════════════════${NC}"
+    echo -e "${WHITE}════════════════════════════════════════════════════════${NC}"
     
-    send_telegram "✅ *AKUN ZIVPN EXPRESS BARU*
-Password : \`$PASSWORD\`
-Limit IP : $LIMIT Device
-Expired  : $EXP_DATE
-Server   : $LOKASI"
+    send_telegram "✅ AKUN ZIVPN EXPRESS BARU\nPassword : $PASSWORD\nLimit IP : $LIMIT Device\nExpired  : $EXP_DATE\nServer   : $LOKASI"
     
     press_enter
 }
@@ -948,13 +950,10 @@ create_mass() {
         local list=""
         for item in "${created[@]}"; do
             IFS='|' read -r name pass days <<< "$item"
-            list="$list\n- $name : \`$pass\` $days hari"
+            list="$list\n- $name : $pass $days hari"
         done
         
-        send_telegram "✅ *MASS CREATE ZIVPN EXPRESS*
-Total: $success akun
-Limit: $limit_display
-Daftar:$list"
+        send_telegram "✅ MASS CREATE ZIVPN EXPRESS\nTotal: $success akun\nLimit: $limit_display\nDaftar:$list"
     fi
     
     if [[ $failed -gt 0 ]]; then
@@ -1037,9 +1036,13 @@ list_user() {
         else
             local sisa_hari=$(hitung_sisa_hari "$expiry")
             
-            if [[ $sisa_hari -ge 0 ]]; then
+            if [[ $sisa_hari -gt 0 ]]; then
                 status="${GREEN}Aktif${NC}"
                 sisa="$sisa_hari hari"
+                ((aktif++))
+            elif [[ $sisa_hari -eq 0 ]]; then
+                status="${YELLOW}Hari ini${NC}"
+                sisa="Habis hari ini"
                 ((aktif++))
             else
                 status="${RED}Expired${NC}"
@@ -1094,7 +1097,7 @@ hapus_user() {
         sed -i "/|$pass|/d" "$DB"
         update_config_json
         echo -e "${GREEN}✓ User $pass dihapus${NC}"
-        send_telegram "🗑 *User Dihapus*\nPassword: \`$pass\`"
+        send_telegram "🗑 User Dihapus\nPassword: $pass"
     fi
     
     press_enter
@@ -1129,7 +1132,7 @@ hapus_expired() {
         update_config_json
         echo ""
         echo -e "${GREEN}✓ $count user expired dihapus${NC}"
-        send_telegram "🧹 *HAPUS EXPIRED*\n$count user dihapus:$list"
+        send_telegram "🧹 HAPUS EXPIRED\n$count user dihapus:$list"
     else
         rm -f "$tmp"
         echo -e "${YELLOW}Tidak ada user expired${NC}"
@@ -1255,7 +1258,7 @@ EOF
         echo -e "${YELLOW}Data akun tetap dipertahankan${NC}"
     fi
     
-    send_telegram "✅ *ZIVPN EXPRESS INSTALLED*\nIP: $(get_ip)\nMode: $([ "$mode" == "1" ] && echo "Baru" || echo "Update")"
+    send_telegram "✅ ZIVPN EXPRESS INSTALLED\nIP: $(get_ip)\nMode: $([ "$mode" == "1" ] && echo "Baru" || echo "Update")"
     
     press_enter
 }
@@ -1274,7 +1277,7 @@ restart_service() {
     
     if systemctl is-active zivpn.service > /dev/null; then
         echo -e "${GREEN}✓ Service berhasil direstart${NC}"
-        send_telegram "🔄 *Service Restart*\nZIVPN Express direstart"
+        send_telegram "🔄 Service Restart\nZIVPN Express direstart"
     else
         echo -e "${RED}✗ Service gagal direstart${NC}"
     fi
@@ -1301,7 +1304,7 @@ uninstall() {
         systemctl daemon-reload
         
         echo -e "${GREEN}✓ Uninstall selesai${NC}"
-        send_telegram "❌ *ZIVPN EXPRESS UNINSTALL*\nIP: $(get_ip)"
+        send_telegram "❌ ZIVPN EXPRESS UNINSTALL\nIP: $(get_ip)"
         sleep 2
         exit 0
     fi
@@ -1369,10 +1372,10 @@ main_menu() {
                 *) echo -e "${RED}Pilihan tidak valid${NC}"; sleep 1 ;;
             esac
         else
-            echo -e "  ${GREEN}1${NC}. Create Akun Random "
+            echo -e "  ${GREEN}1${NC}. Create Akun Random 2 Digit"
             echo -e "  ${GREEN}2${NC}. Create Mass Accounts"
             echo -e "  ${CYAN}3${NC}. Cek User Online"
-            echo -e "  ${CYAN}4${NC}. List User "
+            echo -e "  ${CYAN}4${NC}. List User + Sisa Hari"
             echo -e "  ${RED}5${NC}. Hapus User"
             echo -e "  ${RED}6${NC}. Hapus Expired"
             echo -e "  ${BLUE}7${NC}. Set Domain"
