@@ -2,6 +2,7 @@
 # =============================================
 #   ZIVPN EXPRESS MANAGER
 #   Store: Zivpn Express
+#   Fitur: Backup dengan format siap copy untuk create mass
 #   Update: wget -O zivex.sh https://raw.githubusercontent.com/script-VIP/Vip/main/udp/zivex.sh && chmod +x zivex.sh && bash zivex.sh
 # =============================================
 
@@ -26,7 +27,7 @@ touch "$DB"
 # Load domain
 DOMAIN=$(cat "$DOMAIN_FILE" 2>/dev/null || echo "-")
 
-# === WARNA (TANPA KURUNG) ===
+# === WARNA ===
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -64,10 +65,6 @@ get_ip() {
 
 get_location() {
     curl -s ipinfo.io/city 2>/dev/null || echo "Unknown"
-}
-
-get_isp() {
-    curl -s ipinfo.io/org 2>/dev/null | cut -d' ' -f2- || echo "Unknown"
 }
 
 press_enter() {
@@ -118,60 +115,82 @@ send_telegram() {
         -d parse_mode="Markdown" > /dev/null 2>&1
 }
 
-send_file_telegram() {
-    local file="$1"
-    local caption="$2"
-    [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ] && return 1
-    [ ! -f "$file" ] && return 1
-    curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendDocument" \
-        -F chat_id="$CHAT_ID" \
-        -F document=@"$file" \
-        -F caption="$caption" \
-        -F parse_mode="Markdown" > /dev/null 2>&1
+# === FUNGSI HITUNG SISA HARI (PEMBULATAN KE ATAS) ===
+hitung_sisa_hari() {
+    local expiry="$1"
+    local today_epoch=$(date +%s)
+    local exp_epoch=$(date -d "$expiry" +%s 2>/dev/null)
+    local diff_seconds=$((exp_epoch - today_epoch))
+    local diff_hari=$((diff_seconds / 86400))
+    local sisa_jam=$(( (diff_seconds % 86400) / 3600 ))
+    local sisa_menit=$(( (diff_seconds % 3600) / 60 ))
+    
+    # Pembulatan ke atas jika ada sisa jam atau menit
+    if [[ $sisa_jam -gt 0 ]] || [[ $sisa_menit -gt 0 ]]; then
+        echo $((diff_hari + 1))
+    else
+        echo $diff_hari
+    fi
 }
 
-# === AUTO BACKUP FUNCTION ===
+# === AUTO BACKUP FUNCTION (FORMAT SIAP COPY) ===
 auto_backup() {
     # Load token
     source "$TG_FILE" 2>/dev/null
     
-    # Ambil semua user aktif
     local today=$(date +%Y-%m-%d)
     local today_epoch=$(date +%s)
-    local backup_text="📁 *AUTO BACKUP ZIVPN EXPRESS*
+    local backup_text="📁 BACKUP ZIVPN EXPRESS
 ══════════════════════
-Tanggal: $(date +"%d %B %Y %H:%M")
+Waktu  : $(date +"%d %B %Y %H:%M")
 Domain : $DOMAIN
 IP     : $(get_ip)
 ══════════════════════
 
-*DAFTAR USER & SISA MASA AKTIF*
+DAFTAR USER SISA MASA AKTIF
+
 "
     
+    local current_limit=""
+    local total_user=0
+    
     while IFS='|' read -r user pass expiry limit; do
-        if [[ "$expiry" == "unlimited" ]]; then
-            sisa="Unlimited"
-            status="Aktif"
-        else
+        # Skip expired
+        if [[ "$expiry" != "unlimited" ]]; then
             local exp_epoch=$(date -d "$expiry" +%s 2>/dev/null)
-            local diff_days=$(( (exp_epoch - today_epoch) / 86400 ))
-            if [[ $diff_days -ge 0 ]]; then
-                sisa="$diff_days hari"
-                status="Aktif"
-            else
-                sisa="Expired"
-                status="Expired"
+            if [[ $exp_epoch -lt $today_epoch ]]; then
                 continue
             fi
         fi
-        backup_text="$backup_text\n• $pass | Sisa: $sisa | Limit: $limit IP"
+        
+        # Tulis Limit IP jika berubah
+        if [[ "$limit" != "$current_limit" ]]; then
+            backup_text="$backup_text────────────────────
+Limit IP: $limit
+────────────────────
+"
+            current_limit="$limit"
+        fi
+        
+        # Hitung sisa hari (dibulatkan ke atas)
+        if [[ "$expiry" == "unlimited" ]]; then
+            backup_text="$backup_text$pass 0\n"
+        else
+            local sisa_hari=$(hitung_sisa_hari "$expiry")
+            backup_text="$backup_text$pass $sisa_hari\n"
+        fi
+        ((total_user++))
+        
     done < "$DB"
     
-    backup_text="$backup_text\n══════════════════════"
+    backup_text="$backup_text
+══════════════════════
+Total User: $total_user"
+    
     send_telegram "$backup_text"
 }
 
-# === SETUP AUTO BACKUP CRON ===
+# === SETUP AUTO BACKUP ===
 setup_autobackup() {
     clear
     echo -e "${BOLD}${YELLOW}════════════════════════════════════════════════════════${NC}"
@@ -180,15 +199,22 @@ setup_autobackup() {
     echo ""
     
     # Cek cron yang ada
-    if crontab -l 2>/dev/null | grep -q "zivex.sh --autobackup"; then
-        local jadwal=$(crontab -l | grep "zivex.sh.*--autobackup" | awk '{print "Jam " $2 ":00"}' | head -1)
+    local cron_exists=$(crontab -l 2>/dev/null | grep -c "zivex.sh.*--autobackup")
+    
+    if [[ $cron_exists -gt 0 ]]; then
+        local jadwal=$(crontab -l | grep "zivex.sh.*--autobackup" | head -1 | awk '{print "Jam " $2 ":00"}')
         echo -e "${GREEN}Status: AKTIF${NC}"
         echo -e "Jadwal: ${YELLOW}$jadwal${NC}"
         echo ""
         echo "1. Nonaktifkan Auto Backup"
-        echo "2. Ubah Jadwal"
-        echo "3. Kembali"
+        echo "2. Setiap 6 jam"
+        echo "3. Setiap 12 jam"
+        echo "4. Setiap 24 jam (Jam 23:00)"
+        echo "5. Custom jam"
+        echo "6. Kembali"
+        echo ""
         read -rp "Pilih: " opt
+        
         case $opt in
             1)
                 crontab -l | grep -v "zivex.sh.*--autobackup" | crontab -
@@ -196,11 +222,29 @@ setup_autobackup() {
                 sleep 2
                 ;;
             2)
+                crontab -l | grep -v "zivex.sh.*--autobackup" | crontab -
+                (crontab -l 2>/dev/null; echo "0 */6 * * * /root/zivex.sh --autobackup") | crontab -
+                echo -e "${GREEN}Auto Backup aktif setiap 6 jam${NC}"
+                sleep 2
+                ;;
+            3)
+                crontab -l | grep -v "zivex.sh.*--autobackup" | crontab -
+                (crontab -l 2>/dev/null; echo "0 */12 * * * /root/zivex.sh --autobackup") | crontab -
+                echo -e "${GREEN}Auto Backup aktif setiap 12 jam${NC}"
+                sleep 2
+                ;;
+            4)
+                crontab -l | grep -v "zivex.sh.*--autobackup" | crontab -
+                (crontab -l 2>/dev/null; echo "0 23 * * * /root/zivex.sh --autobackup") | crontab -
+                echo -e "${GREEN}Auto Backup aktif setiap hari jam 23:00${NC}"
+                sleep 2
+                ;;
+            5)
                 read -rp "Masukkan jam (0-23): " hour
                 if [[ "$hour" =~ ^[0-9]+$ ]] && [ "$hour" -ge 0 ] && [ "$hour" -le 23 ]; then
                     crontab -l | grep -v "zivex.sh.*--autobackup" | crontab -
                     (crontab -l 2>/dev/null; echo "0 $hour * * * /root/zivex.sh --autobackup") | crontab -
-                    echo -e "${GREEN}Auto Backup diset ke jam $hour:00${NC}"
+                    echo -e "${GREEN}Auto Backup aktif setiap hari jam $hour:00${NC}"
                 else
                     echo -e "${RED}Jam tidak valid${NC}"
                 fi
@@ -210,21 +254,35 @@ setup_autobackup() {
     else
         echo -e "${RED}Status: NONAKTIF${NC}"
         echo ""
-        echo "1. Aktifkan Auto Backup (Jam 03:00)"
-        echo "2. Set Jadwal Manual"
-        echo "3. Kembali"
+        echo "1. Setiap 6 jam"
+        echo "2. Setiap 12 jam"
+        echo "3. Setiap 24 jam (Jam 23:00)"
+        echo "4. Custom jam"
+        echo "5. Kembali"
+        echo ""
         read -rp "Pilih: " opt
+        
         case $opt in
             1)
-                (crontab -l 2>/dev/null; echo "0 3 * * * /root/zivex.sh --autobackup") | crontab -
-                echo -e "${GREEN}Auto Backup diaktifkan (Jam 03:00)${NC}"
+                (crontab -l 2>/dev/null; echo "0 */6 * * * /root/zivex.sh --autobackup") | crontab -
+                echo -e "${GREEN}Auto Backup aktif setiap 6 jam${NC}"
                 sleep 2
                 ;;
             2)
+                (crontab -l 2>/dev/null; echo "0 */12 * * * /root/zivex.sh --autobackup") | crontab -
+                echo -e "${GREEN}Auto Backup aktif setiap 12 jam${NC}"
+                sleep 2
+                ;;
+            3)
+                (crontab -l 2>/dev/null; echo "0 23 * * * /root/zivex.sh --autobackup") | crontab -
+                echo -e "${GREEN}Auto Backup aktif setiap hari jam 23:00${NC}"
+                sleep 2
+                ;;
+            4)
                 read -rp "Masukkan jam (0-23): " hour
                 if [[ "$hour" =~ ^[0-9]+$ ]] && [ "$hour" -ge 0 ] && [ "$hour" -le 23 ]; then
                     (crontab -l 2>/dev/null; echo "0 $hour * * * /root/zivex.sh --autobackup") | crontab -
-                    echo -e "${GREEN}Auto Backup diset ke jam $hour:00${NC}"
+                    echo -e "${GREEN}Auto Backup aktif setiap hari jam $hour:00${NC}"
                 else
                     echo -e "${RED}Jam tidak valid${NC}"
                 fi
@@ -234,7 +292,81 @@ setup_autobackup() {
     fi
 }
 
-# === GANTI TOKEN TELEGRAM ===
+# === BACKUP LANGSUNG KE TELEGRAM (FORMAT SIAP COPY) ===
+backup_langsung() {
+    clear
+    echo -e "${BOLD}${YELLOW}════════════════════════════════════════════════════════${NC}"
+    echo -e "${YELLOW}            BACKUP LANGSUNG KE TELEGRAM${NC}"
+    echo -e "${BOLD}${YELLOW}════════════════════════════════════════════════════════${NC}"
+    echo ""
+    
+    if [[ ! -s "$DB" ]]; then
+        echo -e "${YELLOW}Belum ada user untuk di-backup${NC}"
+        press_enter
+        return
+    fi
+    
+    echo -e "${GREEN}Menyiapkan backup...${NC}"
+    
+    local today=$(date +%Y-%m-%d)
+    local today_epoch=$(date +%s)
+    local backup_text="📁 BACKUP ZIVPN EXPRESS
+══════════════════════
+Waktu  : $(date +"%d %B %Y %H:%M")
+Domain : $DOMAIN
+IP     : $(get_ip)
+══════════════════════
+
+DAFTAR USER SISA MASA AKTIF
+
+"
+    
+    local current_limit=""
+    local total_user=0
+    
+    while IFS='|' read -r user pass expiry limit; do
+        # Skip expired
+        if [[ "$expiry" != "unlimited" ]]; then
+            local exp_epoch=$(date -d "$expiry" +%s 2>/dev/null)
+            if [[ $exp_epoch -lt $today_epoch ]]; then
+                continue
+            fi
+        fi
+        
+        # Tulis Limit IP jika berubah
+        if [[ "$limit" != "$current_limit" ]]; then
+            backup_text="$backup_text────────────────────
+Limit IP: $limit
+────────────────────
+"
+            current_limit="$limit"
+        fi
+        
+        # Hitung sisa hari (dibulatkan ke atas)
+        if [[ "$expiry" == "unlimited" ]]; then
+            backup_text="$backup_text$pass 0\n"
+        else
+            local sisa_hari=$(hitung_sisa_hari "$expiry")
+            backup_text="$backup_text$pass $sisa_hari\n"
+        fi
+        ((total_user++))
+        
+    done < "$DB"
+    
+    backup_text="$backup_text
+══════════════════════
+Total User: $total_user"
+    
+    echo -e "${GREEN}Mengirim ke Telegram...${NC}"
+    send_telegram "$backup_text"
+    
+    echo -e "${GREEN}✓ Backup terkirim${NC}"
+    echo ""
+    echo -e "${YELLOW}Format backup sudah siap untuk di-copy dan di-create mass${NC}"
+    sleep 3
+}
+
+# === GANTI TOKEN ===
 ganti_token() {
     clear
     echo -e "${BOLD}${YELLOW}════════════════════════════════════════════════════════${NC}"
@@ -271,7 +403,353 @@ EOF
     sleep 2
 }
 
-# === BANNER TANPA KURUNG ===
+# === RESTORE DARI FILE ===
+restore_dari_file() {
+    clear
+    echo -e "${BOLD}${YELLOW}════════════════════════════════════════════════════════${NC}"
+    echo -e "${YELLOW}              RESTORE DARI FILE${NC}"
+    echo -e "${BOLD}${YELLOW}════════════════════════════════════════════════════════${NC}"
+    echo ""
+    
+    echo -e "File backup di $BACKUP_DIR:"
+    echo -e "${WHITE}────────────────────────────────────────────────────${NC}"
+    ls -lh "$BACKUP_DIR"/*.txt 2>/dev/null | awk '{print "  " $9 " (" $5 ")"}' | head -10
+    if [[ $? -ne 0 ]]; then
+        echo -e "  ${YELLOW}Tidak ada file backup${NC}"
+    fi
+    echo -e "${WHITE}────────────────────────────────────────────────────${NC}"
+    echo ""
+    
+    read -rp "Masukkan nama file: " filename
+    local file_path="$BACKUP_DIR/$filename"
+    
+    if [[ ! -f "$file_path" ]]; then
+        echo -e "${RED}File tidak ditemukan${NC}"
+        press_enter
+        return
+    fi
+    
+    # Backup database lama
+    local db_backup="$BACKUP_DIR/db_before_restore_$(date +%Y%m%d_%H%M%S).db"
+    cp "$DB" "$db_backup"
+    echo -e "${GREEN}✓ Database lama dibackup ke: $db_backup${NC}"
+    echo ""
+    
+    # Proses restore
+    local current_limit="2"
+    local restored=0
+    local skipped=0
+    local failed=0
+    local created_list=()
+    
+    echo -e "${WHITE}MEMPROSES RESTORE...${NC}"
+    echo -e "${WHITE}────────────────────────────────────────────────────${NC}"
+    
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        # Skip baris yang bukan data user (header, garis, dll)
+        if [[ "$line" =~ ^📁 ]] || [[ "$line" =~ ^════ ]] || [[ "$line" =~ ^Waktu ]] || [[ "$line" =~ ^Domain ]] || [[ "$line" =~ ^IP ]] || [[ "$line" =~ ^DAFTAR ]] || [[ "$line" =~ ^──────────────────── ]] || [[ "$line" =~ ^Total ]] || [[ -z "$line" ]]; then
+            continue
+        fi
+        
+        # Cek baris Limit IP
+        if [[ "$line" =~ ^Limit[[:space:]]IP:[[:space:]]([0-9]+)$ ]]; then
+            current_limit="${BASH_REMATCH[1]}"
+            echo -e "${YELLOW}→ Set Limit IP: $current_limit${NC}"
+            continue
+        fi
+        
+        # Parse user (nama sisa_hari)
+        local arr=($line)
+        if [[ ${#arr[@]} -ge 2 ]]; then
+            local name="${arr[0]}"
+            local days="${arr[1]}"
+            
+            # Validasi days harus angka
+            if ! [[ "$days" =~ ^[0-9]+$ ]]; then
+                echo -e "${RED}✗ $line (bukan angka)${NC}"
+                ((failed++))
+                continue
+            fi
+            
+            local password="$name"
+            
+            # Cek duplikasi
+            if grep -q "|$password|" "$DB" 2>/dev/null; then
+                echo -e "${YELLOW}⚠ $password sudah ada, dilewati${NC}"
+                ((skipped++))
+                continue
+            fi
+            
+            # Hitung expired dari HARI INI + days
+            if [[ "$days" == "0" ]]; then
+                exp="unlimited"
+            else
+                exp=$(date -d "+$days days" +"%Y-%m-%d")
+            fi
+            
+            # Simpan ke database
+            echo "user_$password|$password|$exp|$current_limit" >> "$DB"
+            echo -e "${GREEN}✓ $password ($days hari, limit: $current_limit)${NC}"
+            ((restored++))
+            created_list+=("$name|$password|$days")
+        fi
+    done < "$file_path"
+    
+    echo -e "${WHITE}────────────────────────────────────────────────────${NC}"
+    echo ""
+    
+    if [[ $restored -gt 0 ]]; then
+        update_config_json
+        echo -e "${GREEN}✓ RESTORE SELESAI${NC}"
+        echo -e "  Berhasil: $restored user"
+        echo -e "  Dilewati: $skipped user"
+        echo -e "  Gagal   : $failed user"
+        echo ""
+        
+        # Kirim notifikasi
+        local list=""
+        for item in "${created_list[@]}"; do
+            IFS='|' read -r name pass days <<< "$item"
+            list="$list\n- $name : \`$pass\` $days hari"
+        done
+        
+        send_telegram "🔄 *RESTORE DARI FILE*
+Berhasil: $restored user
+Dilewati: $skipped user
+Daftar Baru:$list"
+    fi
+    
+    press_enter
+}
+
+# === RESTORE DARI LINK URL ===
+restore_dari_link() {
+    clear
+    echo -e "${BOLD}${YELLOW}════════════════════════════════════════════════════════${NC}"
+    echo -e "${YELLOW}              RESTORE DARI LINK URL${NC}"
+    echo -e "${BOLD}${YELLOW}════════════════════════════════════════════════════════${NC}"
+    echo ""
+    
+    read -rp "Masukkan URL file backup: " file_url
+    
+    if [[ -z "$file_url" ]]; then
+        echo -e "${RED}URL tidak boleh kosong${NC}"
+        press_enter
+        return
+    fi
+    
+    local file_path="/tmp/restore_$$.txt"
+    echo -e "${YELLOW}Mengunduh file...${NC}"
+    
+    if wget -q --show-progress "$file_url" -O "$file_path"; then
+        echo -e "${GREEN}✓ Download berhasil${NC}"
+    else
+        echo -e "${RED}✗ Gagal mengunduh file${NC}"
+        rm -f "$file_path"
+        press_enter
+        return
+    fi
+    
+    # Backup database lama
+    local db_backup="$BACKUP_DIR/db_before_restore_$(date +%Y%m%d_%H%M%S).db"
+    cp "$DB" "$db_backup"
+    echo -e "${GREEN}✓ Database lama dibackup ke: $db_backup${NC}"
+    echo ""
+    
+    # Proses restore
+    local current_limit="2"
+    local restored=0
+    local skipped=0
+    local failed=0
+    local created_list=()
+    
+    echo -e "${WHITE}MEMPROSES RESTORE...${NC}"
+    echo -e "${WHITE}────────────────────────────────────────────────────${NC}"
+    
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        # Skip baris yang bukan data user
+        if [[ "$line" =~ ^📁 ]] || [[ "$line" =~ ^════ ]] || [[ "$line" =~ ^Waktu ]] || [[ "$line" =~ ^Domain ]] || [[ "$line" =~ ^IP ]] || [[ "$line" =~ ^DAFTAR ]] || [[ "$line" =~ ^──────────────────── ]] || [[ "$line" =~ ^Total ]] || [[ -z "$line" ]]; then
+            continue
+        fi
+        
+        # Cek baris Limit IP
+        if [[ "$line" =~ ^Limit[[:space:]]IP:[[:space:]]([0-9]+)$ ]]; then
+            current_limit="${BASH_REMATCH[1]}"
+            echo -e "${YELLOW}→ Set Limit IP: $current_limit${NC}"
+            continue
+        fi
+        
+        # Parse user
+        local arr=($line)
+        if [[ ${#arr[@]} -ge 2 ]]; then
+            local name="${arr[0]}"
+            local days="${arr[1]}"
+            
+            if ! [[ "$days" =~ ^[0-9]+$ ]]; then
+                echo -e "${RED}✗ $line (bukan angka)${NC}"
+                ((failed++))
+                continue
+            fi
+            
+            local password="$name"
+            
+            if grep -q "|$password|" "$DB" 2>/dev/null; then
+                echo -e "${YELLOW}⚠ $password sudah ada, dilewati${NC}"
+                ((skipped++))
+                continue
+            fi
+            
+            if [[ "$days" == "0" ]]; then
+                exp="unlimited"
+            else
+                exp=$(date -d "+$days days" +"%Y-%m-%d")
+            fi
+            
+            echo "user_$password|$password|$exp|$current_limit" >> "$DB"
+            echo -e "${GREEN}✓ $password ($days hari, limit: $current_limit)${NC}"
+            ((restored++))
+            created_list+=("$name|$password|$days")
+        fi
+    done < "$file_path"
+    
+    echo -e "${WHITE}────────────────────────────────────────────────────${NC}"
+    echo ""
+    
+    if [[ $restored -gt 0 ]]; then
+        update_config_json
+        echo -e "${GREEN}✓ RESTORE SELESAI${NC}"
+        echo -e "  Berhasil: $restored user"
+        echo -e "  Dilewati: $skipped user"
+        echo -e "  Gagal   : $failed user"
+        
+        send_telegram "🔄 *RESTORE DARI LINK*
+Berhasil: $restored user
+Dilewati: $skipped user"
+    fi
+    
+    rm -f "$file_path"
+    press_enter
+}
+
+# === RESTORE DARI TELEGRAM ===
+restore_dari_telegram() {
+    clear
+    echo -e "${BOLD}${YELLOW}════════════════════════════════════════════════════════${NC}"
+    echo -e "${YELLOW}              RESTORE DARI TELEGRAM${NC}"
+    echo -e "${BOLD}${YELLOW}════════════════════════════════════════════════════════${NC}"
+    echo ""
+    
+    echo -e "Cara dapat file path:"
+    echo -e "1. Buka chat dengan bot"
+    echo -e "2. Cari file backup yang dikirim"
+    echo -e "3. Klik file → Copy link/file path"
+    echo -e "4. Paste di sini"
+    echo ""
+    
+    read -rp "Masukkan File ID/Path: " file_id
+    
+    if [[ -z "$file_id" ]]; then
+        echo -e "${RED}File ID tidak boleh kosong${NC}"
+        press_enter
+        return
+    fi
+    
+    local file_path="/tmp/restore_$$.txt"
+    local download_url="https://api.telegram.org/file/bot$BOT_TOKEN/$file_id"
+    
+    echo -e "${YELLOW}Mengunduh dari Telegram...${NC}"
+    
+    if wget -q --show-progress "$download_url" -O "$file_path"; then
+        echo -e "${GREEN}✓ Download berhasil${NC}"
+    else
+        echo -e "${RED}✗ Gagal mengunduh file${NC}"
+        rm -f "$file_path"
+        press_enter
+        return
+    fi
+    
+    # Backup database lama
+    local db_backup="$BACKUP_DIR/db_before_restore_$(date +%Y%m%d_%H%M%S).db"
+    cp "$DB" "$db_backup"
+    echo -e "${GREEN}✓ Database lama dibackup ke: $db_backup${NC}"
+    echo ""
+    
+    # Proses restore
+    local current_limit="2"
+    local restored=0
+    local skipped=0
+    local failed=0
+    local created_list=()
+    
+    echo -e "${WHITE}MEMPROSES RESTORE...${NC}"
+    echo -e "${WHITE}────────────────────────────────────────────────────${NC}"
+    
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        # Skip baris yang bukan data user
+        if [[ "$line" =~ ^📁 ]] || [[ "$line" =~ ^════ ]] || [[ "$line" =~ ^Waktu ]] || [[ "$line" =~ ^Domain ]] || [[ "$line" =~ ^IP ]] || [[ "$line" =~ ^DAFTAR ]] || [[ "$line" =~ ^──────────────────── ]] || [[ "$line" =~ ^Total ]] || [[ -z "$line" ]]; then
+            continue
+        fi
+        
+        # Cek baris Limit IP
+        if [[ "$line" =~ ^Limit[[:space:]]IP:[[:space:]]([0-9]+)$ ]]; then
+            current_limit="${BASH_REMATCH[1]}"
+            echo -e "${YELLOW}→ Set Limit IP: $current_limit${NC}"
+            continue
+        fi
+        
+        # Parse user
+        local arr=($line)
+        if [[ ${#arr[@]} -ge 2 ]]; then
+            local name="${arr[0]}"
+            local days="${arr[1]}"
+            
+            if ! [[ "$days" =~ ^[0-9]+$ ]]; then
+                echo -e "${RED}✗ $line (bukan angka)${NC}"
+                ((failed++))
+                continue
+            fi
+            
+            local password="$name"
+            
+            if grep -q "|$password|" "$DB" 2>/dev/null; then
+                echo -e "${YELLOW}⚠ $password sudah ada, dilewati${NC}"
+                ((skipped++))
+                continue
+            fi
+            
+            if [[ "$days" == "0" ]]; then
+                exp="unlimited"
+            else
+                exp=$(date -d "+$days days" +"%Y-%m-%d")
+            fi
+            
+            echo "user_$password|$password|$exp|$current_limit" >> "$DB"
+            echo -e "${GREEN}✓ $password ($days hari, limit: $current_limit)${NC}"
+            ((restored++))
+            created_list+=("$name|$password|$days")
+        fi
+    done < "$file_path"
+    
+    echo -e "${WHITE}────────────────────────────────────────────────────${NC}"
+    echo ""
+    
+    if [[ $restored -gt 0 ]]; then
+        update_config_json
+        echo -e "${GREEN}✓ RESTORE SELESAI${NC}"
+        echo -e "  Berhasil: $restored user"
+        echo -e "  Dilewati: $skipped user"
+        echo -e "  Gagal   : $failed user"
+        
+        send_telegram "🔄 *RESTORE DARI TELEGRAM*
+Berhasil: $restored user
+Dilewati: $skipped user"
+    fi
+    
+    rm -f "$file_path"
+    press_enter
+}
+
+# === BANNER ===
 banner() {
     clear
     echo -e "${CYAN}"
@@ -283,7 +761,7 @@ banner() {
     echo -e "  ╚══════╝╚═╝  ╚═══╝  ╚═╝     ╚═╝  ╚═══╝"
     echo -e "${NC}"
     echo -e "${WHITE}  ════════════════════════════════════════════${NC}"
-    echo -e "${YELLOW}         ZIVPN EXPRESS - Udp Tunnel${NC}"
+    echo -e "${YELLOW}         ZIVPN EXPRESS - UDP TUNNEL${NC}"
     echo -e "${WHITE}  ════════════════════════════════════════════${NC}"
     
     if [[ -f "$ZIVPN_BIN" ]]; then
@@ -296,7 +774,7 @@ banner() {
         echo -e "  ${WHITE}IP       :${NC} ${CYAN}$ip${NC}"
         echo -e "  ${WHITE}Domain   :${NC} ${CYAN}$DOMAIN${NC}"
         echo -e "  ${WHITE}Total User:${NC} ${GREEN}$total_user${NC}"
-        echo -e "  ${WHITE}Online   :${NC} ${GREEN}$online${NC} koneksi"
+        #echo -e "  ${WHITE}Online   :${NC} ${GREEN}$online${NC} koneksi"
     fi
     echo -e "${WHITE}  ════════════════════════════════════════════${NC}"
     echo ""
@@ -359,9 +837,9 @@ create_account() {
     # Tampilkan hasil
     echo ""
     echo -e "${GREEN}✓ Terima kasih sudah order kak😁${NC}"
-    echo -e "${WHITE}══════════════════════${NC}"
+    echo -e "${WHITE}═════════════════════════${NC}"
     echo -e "  ${CYAN}ZIVPN EXPRESS${NC}"
-    echo -e "${WHITE}──────────────────────${NC}"
+    echo -e "${WHITE}─────────────────────────${NC}"
     
     if [[ "$DOMAIN" != "-" ]]; then
         echo -e "  Domain      : ${CYAN}$DOMAIN${NC}"
@@ -371,13 +849,13 @@ create_account() {
     echo -e "  Password    : ${YELLOW}$PASSWORD${NC}"
     echo -e "  Limit IP    : ${PURPLE}$([ "$LIMIT" == "0" ] && echo "Unlimited" || echo "$LIMIT Device")${NC}"
     echo -e "  Server      : ${CYAN}$LOKASI${NC}"
-    echo -e "${WHITE}──────────────────────${NC}"
+    #echo -e "${WHITE}────────────────────────${NC}"
     echo -e "  Tanggal Buat: ${GREEN}$CREATE_DATE${NC}"
     echo -e "  Tanggal Exp : ${YELLOW}$EXP_DATE${NC}"
     echo -e "  Masa Aktif  : ${YELLOW}$DAYS hari${NC}"
-    echo -e "${WHITE}──────────────────────${NC}"
+    echo -e "${WHITE}─────────────────────────${NC}"
     echo -e "  ${YELLOW}Tutorial ZIVPN APP${NC}"
-    echo -e "${WHITE}──────────────────────${NC}"
+    echo -e "${WHITE}─────────────────────────${NC}"
     echo -e "  1. Buka ZIVPN App"
     echo -e "  2. Centang Udp"
     echo -e "  3. Klik Garis tiga pojok kiri atas"
@@ -389,9 +867,9 @@ create_account() {
         echo -e "  5. UDP Server  : ${CYAN}$(get_ip)${NC}"
     fi
     echo -e "     UDP Password: ${CYAN}$PASSWORD${NC}"
-    echo -e "  6. Pilih negara bebas rekom $LOKASI"
+    echo -e "  6. Pilih negara bebas. opsi $LOKASI"
     echo -e "  7. Klik APPLY → START"
-    echo -e "${WHITE}${NC}"
+    #echo -e "${WHITE}══════════════════════════════════════${NC}"
     
     send_telegram "✅ *AKUN ZIVPN EXPRESS BARU*
 Password : \`$PASSWORD\`
@@ -402,7 +880,7 @@ Server   : $LOKASI"
     press_enter
 }
 
-# === CREATE MASS ACCOUNTS (TANPA GARIS |) ===
+# === CREATE MASS ACCOUNTS ===
 create_mass() {
     banner
     
@@ -519,7 +997,7 @@ Daftar:$list"
     press_enter
 }
 
-# === CEK USER ONLINE & DEVICE ===
+# === CEK USER ONLINE ===
 cek_online() {
     clear
     
@@ -561,7 +1039,7 @@ cek_online() {
     press_enter
 }
 
-# === LIST USER DENGAN SISA MASA AKTIF ===
+# === LIST USER ===
 list_user() {
     clear
     
@@ -590,12 +1068,11 @@ list_user() {
             sisa="Unlimited"
             ((aktif++))
         else
-            local exp_epoch=$(date -d "$expiry" +%s 2>/dev/null)
-            local diff_days=$(( (exp_epoch - today_epoch) / 86400 ))
+            local sisa_hari=$(hitung_sisa_hari "$expiry")
             
-            if [[ $diff_days -ge 0 ]]; then
+            if [[ $sisa_hari -ge 0 ]]; then
                 status="${GREEN}Aktif${NC}"
-                sisa="$diff_days hari"
+                sisa="$sisa_hari hari"
                 ((aktif++))
             else
                 status="${RED}Expired${NC}"
@@ -873,7 +1350,36 @@ update_script() {
     exec bash /root/zivex.sh
 }
 
-# === MENU UTAMA (TANPA KURUNG) ===
+# === BACKUP MENU ===
+backup_menu() {
+    while true; do
+        clear
+        echo -e "${BOLD}${YELLOW}════════════════════════════════════════════════════════${NC}"
+        echo -e "${YELLOW}              MENU BACKUP & RESTORE${NC}"
+        echo -e "${BOLD}${YELLOW}════════════════════════════════════════════════════════${NC}"
+        echo ""
+        echo -e "  ${GREEN}1${NC}. Backup Langsung ke Telegram"
+        echo -e "  ${GREEN}2${NC}. Setup Auto Backup"
+        echo -e "  ${CYAN}3${NC}. Restore dari File"
+        echo -e "  ${CYAN}4${NC}. Restore dari Link URL"
+        echo -e "  ${CYAN}5${NC}. Restore dari Telegram"
+        echo -e "  ${RED}0${NC}. Kembali"
+        echo ""
+        read -rp "Pilih menu: " bk_choice
+        
+        case $bk_choice in
+            1) backup_langsung ;;
+            2) setup_autobackup ;;
+            3) restore_dari_file ;;
+            4) restore_dari_link ;;
+            5) restore_dari_telegram ;;
+            0) break ;;
+            *) echo -e "${RED}Pilihan tidak valid${NC}"; sleep 1 ;;
+        esac
+    done
+}
+
+# === MENU UTAMA ===
 main_menu() {
     while true; do
         banner
@@ -896,14 +1402,14 @@ main_menu() {
                 *) echo -e "${RED}Pilihan tidak valid${NC}"; sleep 1 ;;
             esac
         else
-            echo -e "  ${GREEN}1${NC}. Create Akun "
+            echo -e "  ${GREEN}1${NC}. Create Akun Random "
             echo -e "  ${GREEN}2${NC}. Create Mass Accounts"
             echo -e "  ${CYAN}3${NC}. Cek User Online"
             echo -e "  ${CYAN}4${NC}. List User "
             echo -e "  ${RED}5${NC}. Hapus User"
             echo -e "  ${RED}6${NC}. Hapus Expired"
             echo -e "  ${BLUE}7${NC}. Set Domain"
-            echo -e "  ${PURPLE}8${NC}. Setup Auto Backup"
+            echo -e "  ${PURPLE}8${NC}. Backup & Restore Menu"
             echo -e "  ${YELLOW}9${NC}. Ganti Token Telegram"
             echo -e "  ${GREEN}10${NC}. Install Ulang"
             echo -e "  ${CYAN}11${NC}. Restart Service"
@@ -921,7 +1427,7 @@ main_menu() {
                 5) hapus_user ;;
                 6) hapus_expired ;;
                 7) set_domain ;;
-                8) setup_autobackup ;;
+                8) backup_menu ;;
                 9) ganti_token ;;
                 10) install_ulang ;;
                 11) restart_service ;;
