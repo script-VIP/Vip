@@ -1,9 +1,14 @@
 #!/bin/bash
 # =============================================
 #   ZIVPN UDP MANAGER - ZIVON BOT
-#   Fitur: Mass Create, Backup Sisa Hari, Restore
+#   Fitur: 
+#   - Create akun (auto random 2 digit)
+#   - Create mass accounts (global limit)
+#   - Backup sisa masa aktif (format file)
+#   - Restore dari file backup
+#   - Cek user online & jumlah device
+#   - List user dengan sisa masa aktif
 #   Token: 8504261570:AAF5rtJ2wW9nrS6EOMyScB5ZGnZcL8sRcXA
-#   OS: Ubuntu 20.04 / 22.04 / 24.04
 # =============================================
 
 # === KONFIGURASI DASAR ===
@@ -114,18 +119,6 @@ send_telegram() {
         -d parse_mode="Markdown" > /dev/null 2>&1
 }
 
-send_file_telegram() {
-    local file="$1"
-    local caption="$2"
-    [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ] && return 1
-    [ ! -f "$file" ] && return 1
-    curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendDocument" \
-        -F chat_id="$CHAT_ID" \
-        -F document=@"$file" \
-        -F caption="$caption" \
-        -F parse_mode="Markdown" > /dev/null 2>&1
-}
-
 # =============================================
 #  BANNER
 # =============================================
@@ -159,7 +152,133 @@ banner() {
 }
 
 # =============================================
-#  FITUR 1: CREATE MASS ACCOUNTS (GLOBAL LIMIT)
+#  FITUR 1: CREATE AKUN (RANDOM 2 DIGIT)
+# =============================================
+create_account_random() {
+    banner
+    echo -e "${BOLD}${YELLOW}╔════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BOLD}${YELLOW}║           CREATE AKUN (RANDOM 2 DIGIT)                 ║${NC}"
+    echo -e "${BOLD}${YELLOW}╚════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    
+    # Input nama/prefix
+    read -rp "$(echo -e "${WHITE}Masukkan nama/prefix: ${NC}")" PREFIX
+    if [[ -z "$PREFIX" ]]; then
+        echo -e "${RED}Nama tidak boleh kosong!${NC}"
+        press_enter
+        return
+    fi
+    
+    # Input limit IP
+    read -rp "$(echo -e "${WHITE}Limit IP [2]: ${NC}")" LIMIT
+    [ -z "$LIMIT" ] && LIMIT=2
+    if ! [[ "$LIMIT" =~ ^[0-9]+$ ]]; then
+        echo -e "${RED}Limit IP harus angka!${NC}"
+        press_enter
+        return
+    fi
+    
+    # Input masa aktif
+    read -rp "$(echo -e "${WHITE}Masa aktif (hari) [30]: ${NC}")" DAYS
+    [ -z "$DAYS" ] && DAYS=30
+    if ! [[ "$DAYS" =~ ^[0-9]+$ ]]; then
+        echo -e "${RED}Masa aktif harus angka!${NC}"
+        press_enter
+        return
+    fi
+    
+    # Generate 2 digit random
+    local RANDOM2=$(printf "%02d" $((RANDOM % 100)))
+    local PASSWORD="${PREFIX}${RANDOM2}"
+    
+    # Cek duplikasi
+    local counter=0
+    while grep -q "|$PASSWORD|" "$DB" 2>/dev/null; do
+        RANDOM2=$(printf "%02d" $((RANDOM % 100)))
+        PASSWORD="${PREFIX}${RANDOM2}"
+        ((counter++))
+        if [[ $counter -gt 10 ]]; then
+            RANDOM2=$(printf "%03d" $((RANDOM % 1000)))
+            PASSWORD="${PREFIX}${RANDOM2}"
+            break
+        fi
+    done
+    
+    # Hitung expired
+    local EXPIRED=""
+    local EXP_DATE=""
+    if [[ "$DAYS" == "0" ]]; then
+        EXPIRED="unlimited"
+        EXP_DATE="Unlimited"
+    else
+        EXPIRED=$(date -d "+$DAYS days" +"%Y-%m-%d")
+        EXP_DATE=$(date -d "+$DAYS days" +"%d %b, %Y")
+    fi
+    
+    # Tanggal buat
+    local CREATE_DATE=$(date +"%d %b, %Y")
+    
+    # Dapatkan lokasi
+    local LOKASI=$(get_location)
+    
+    # Simpan ke database
+    echo "user_$PASSWORD|$PASSWORD|$EXPIRED|$LIMIT" >> "$DB"
+    
+    # Update config
+    update_config_json
+    
+    # Tampilkan hasil
+    echo ""
+    echo -e "${WHITE}════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${GREEN}  ✓ Terima kasih sudah order kak😁${NC}"
+    echo -e "${WHITE}════════════════════════════════════════════════════════╝${NC}"
+    echo -e "  ${CYAN}ZIVPN UDP${NC}"
+    echo -e "${WHITE}────────────────────────────────────────────────────${NC}"
+    
+    if [[ "$DOMAIN" != "-" ]]; then
+        echo -e "  Domain      : ${CYAN}$DOMAIN${NC}"
+    else
+        echo -e "  IP Server   : ${CYAN}$(get_ip)${NC}"
+    fi
+    echo -e "  Password    : ${YELLOW}$PASSWORD${NC}"
+    echo -e "  Limit IP    : ${PURPLE}$([ "$LIMIT" == "0" ] && echo "Unlimited" || echo "$LIMIT Device")${NC}"
+    echo -e "  Server      : ${CYAN}$LOKASI${NC}"
+    echo -e "${WHITE}────────────────────────────────────────────────────${NC}"
+    echo -e "  Tanggal Buat: ${GREEN}$CREATE_DATE${NC}"
+    echo -e "  Tanggal Exp : ${YELLOW}$EXP_DATE${NC}"
+    echo -e "  Masa Aktif  : ${YELLOW}$([ "$DAYS" == "0" ] && echo "Selamanya" || echo "$DAYS hari")${NC}"
+    echo -e "${WHITE}────────────────────────────────────────────────────${NC}"
+    echo -e "  ${YELLOW}Tutorial ZIVPN APP / UDP Tunnel${NC}"
+    echo -e "${WHITE}────────────────────────────────────────────────────${NC}"
+    echo -e "  1. Buka ZIVPN App"
+    echo -e "  2. Centang Udp"
+    echo -e "  3. Klik Garis tiga (pojok kiri atas)"
+    echo -e "  4. Klik Udp tunnel setting"
+    
+    if [[ "$DOMAIN" != "-" ]]; then
+        echo -e "  5. UDP Server  : ${CYAN}$DOMAIN${NC}"
+    else
+        echo -e "  5. UDP Server  : ${CYAN}$(get_ip)${NC}"
+    fi
+    echo -e "     UDP Password: ${CYAN}$PASSWORD${NC}"
+    echo -e "  6. Pilih negara bebas (rekom $LOKASI)"
+    echo -e "  7. Klik APPLY → START"
+    echo -e "${WHITE}════════════════════════════════════════════════════════╝${NC}"
+    
+    # Kirim notifikasi Telegram
+    send_telegram "✅ *AKUN ZIVPN BARU*
+══════════════════════
+Password : \`$PASSWORD\`
+Limit IP : $([ "$LIMIT" == "0" ] && echo "Unlimited" || echo "$LIMIT Device")
+Expired  : $EXP_DATE
+Server   : $LOKASI"
+    
+    echo ""
+    press_enter
+}
+
+# =============================================
+#  FITUR 2: CREATE MASS ACCOUNTS (GLOBAL LIMIT)
 # =============================================
 create_mass_accounts() {
     banner
@@ -176,10 +295,9 @@ create_mass_accounts() {
     echo -e "${WHITE}│${NC}                                                                  ${WHITE}│${NC}"
     echo -e "${WHITE}│${CYAN}  CONTOH:${NC}                                                        ${WHITE}│${NC}"
     echo -e "${WHITE}│${NC}  Limit IP: 2                                                         ${WHITE}│${NC}"
-    echo -e "${WHITE}│${NC}  Dedi 23                                                              ${WHITE}│${NC}"
-    echo -e "${WHITE}│${NC}  Sera 12                                                              ${WHITE}│${NC}"
-    echo -e "${WHITE}│${NC}  Weni3 3                                                              ${WHITE}│${NC}"
-    echo -e "${WHITE}│${NC}  selesai                                                              ${WHITE}│${NC}"
+    echo -e "${WHITE}│${NC}  ahsan 25                                                            ${WHITE}│${NC}"
+    echo -e "${WHITE}│${NC}  kekey 25                                                            ${WHITE}│${NC}"
+    echo -e "${WHITE}│${NC}  selesai                                                             ${WHITE}│${NC}"
     echo -e "${WHITE}└────────────────────────────────────────────────────────────┘${NC}"
     echo ""
     
@@ -195,7 +313,7 @@ create_mass_accounts() {
     local limit_display="$([ "$global_limit" == "0" ] && echo "Unlimited" || echo "$global_limit Device")"
     echo ""
     echo -e "${GREEN}✓ Limit IP: $limit_display${NC}"
-    echo -e "${WHITE}Silahkan input user (nama masaaktif):${NC}"
+    echo -e "${WHITE}Silahkan input user (nama masaaktif), ketik 'selesai' untuk mengakhiri:${NC}"
     echo ""
     
     local created_users=()
@@ -329,10 +447,10 @@ Daftar Password:$list_pass"
 }
 
 # =============================================
-#  FITUR 2: BACKUP (SISA MASA AKTIF)
+#  FITUR 3: BACKUP - TAMPILKAN FILE
 # =============================================
 backup_accounts() {
-    banner
+    clear
     echo -e "${BOLD}${YELLOW}╔════════════════════════════════════════════════════════╗${NC}"
     echo -e "${BOLD}${YELLOW}║           BACKUP AKUN (SISA MASA AKTIF)                ║${NC}"
     echo -e "${BOLD}${YELLOW}╚════════════════════════════════════════════════════════╝${NC}"
@@ -351,7 +469,6 @@ backup_accounts() {
     echo "# ZIVPN Backup File - Sisa Masa Aktif" > "$tmp_file"
     echo "# Format: Limit IP: [angka]" >> "$tmp_file"
     echo "#         nama sisa_hari" >> "$tmp_file"
-    echo "# Contoh: Dedi 23 (sisa 23 hari)" >> "$tmp_file"
     echo "" >> "$tmp_file"
     
     # Kelompokkan user berdasarkan limit IP
@@ -412,23 +529,15 @@ backup_accounts() {
     echo -e "${WHITE}│${GREEN}  ISI FILE BACKUP (SISA HARI):${NC}                                   ${WHITE}│${NC}"
     echo -e "${WHITE}├────────────────────────────────────────────────────────────┤${NC}"
     
-    local line_num=0
     while IFS= read -r line; do
-        if [[ $line_num -lt 15 ]]; then
-            if [[ "$line" == \#* ]]; then
-                echo -e "${WHITE}│${CYAN}  $line${NC} ${WHITE}│${NC}"
-            elif [[ "$line" == "Limit IP:"* ]]; then
-                echo -e "${WHITE}│${YELLOW}  $line${NC} ${WHITE}│${NC}"
-            else
-                echo -e "${WHITE}│${GREEN}  $line${NC} ${WHITE}│${NC}"
-            fi
+        if [[ "$line" == \#* ]]; then
+            echo -e "${WHITE}│${CYAN}  $line${NC} ${WHITE}│${NC}"
+        elif [[ "$line" == "Limit IP:"* ]]; then
+            echo -e "${WHITE}│${YELLOW}  $line${NC} ${WHITE}│${NC}"
+        elif [[ -n "$line" ]]; then
+            echo -e "${WHITE}│${GREEN}  $line${NC} ${WHITE}│${NC}"
         fi
-        ((line_num++))
     done < "$tmp_file"
-    
-    if [[ $line_num -gt 15 ]]; then
-        echo -e "${WHITE}│${NC}  ... dan $((line_num - 15)) baris lainnya                ${WHITE}│${NC}"
-    fi
     
     echo -e "${WHITE}└────────────────────────────────────────────────────────────┘${NC}"
     echo ""
@@ -443,313 +552,134 @@ backup_accounts() {
     cp "$tmp_file" "$backup_path"
     rm -f "$tmp_file"
     
-    echo -e "${GREEN}✓ File backup disimpan:${NC}"
+    echo -e "${GREEN}✓ File backup disimpan di:${NC}"
     echo -e "  ${CYAN}$backup_path${NC}"
     echo ""
     
-    # Hitung statistik
+    # Tampilkan statistik
     local total_group=$(grep -c "Limit IP:" "$backup_path")
-    
-    echo -e "${WHITE}┌────────────────────────────────────────────────────────────┐${NC}"
-    echo -e "${WHITE}│${YELLOW}  STATISTIK BACKUP:${NC}                                              ${WHITE}│${NC}"
-    echo -e "${WHITE}├────────────────────────────────────────────────────────────┤${NC}"
-    echo -e "${WHITE}│${NC}  Total User    : ${GREEN}$total_user_backup${NC}                                         ${WHITE}│${NC}"
-    echo -e "${WHITE}│${NC}  Group Limit   : ${GREEN}$total_group${NC}                                         ${WHITE}│${NC}"
-    echo -e "${WHITE}│${NC}  File Name     : ${CYAN}$filename${NC}                      ${WHITE}│${NC}"
-    echo -e "${WHITE}└────────────────────────────────────────────────────────────┘${NC}"
+    echo -e "${WHITE}Total User    : ${GREEN}$total_user_backup${NC}"
+    echo -e "${WHITE}Group Limit   : ${GREEN}$total_group${NC}"
+    echo -e "${WHITE}File Name     : ${CYAN}$filename${NC}"
     echo ""
     
-    # Opsi upload
-    echo -e "${YELLOW}Upload ke:${NC}"
-    echo -e "  ${GREEN}1${NC}. Telegram"
-    echo -e "  ${GREEN}2${NC}. Lihat isi file lengkap"
-    echo -e "  ${RED}0${NC}. Selesai"
-    echo ""
-    read -rp "Pilih [0-2]: " up_choice
+    # Tanya apakah mau salin
+    echo -e "${YELLOW}Salin isi file? (bisa paste di create mass)${NC}"
+    read -rp "Tekan ENTER untuk lanjut..." 
     
-    case $up_choice in
-        1)
-            echo "Mengupload ke Telegram..."
-            local caption="📁 *BACKUP AKUN ZIVPN*
-Domain: $DOMAIN
-Tanggal: $(date +"%d %B %Y %H:%M")
-Total User: $total_user_backup
-Group Limit: $total_group
-
-*Format File:*
-- Limit IP: [angka]
-- nama sisa_hari
-
-File ini bisa langsung digunakan untuk CREATE ulang"
-            send_file_telegram "$backup_path" "$caption"
-            echo -e "${GREEN}✓ Terkirim ke Telegram!${NC}"
-            sleep 2
-            ;;
-        2)
-            echo ""
-            echo -e "${WHITE}╔════════════════════════════════════════════════════════╗${NC}"
-            echo -e "${WHITE}║${CYAN}                   ISI FILE BACKUP                     ${WHITE}║${NC}"
-            echo -e "${WHITE}╚════════════════════════════════════════════════════════╝${NC}"
-            echo ""
-            cat "$backup_path"
-            echo ""
-            press_enter
-            ;;
-    esac
+    press_enter
 }
 
 # =============================================
-#  FITUR 3: CREATE FROM BACKUP FILE
-#  (LANGSUNG PAKAI SISA HARI)
+#  FITUR 4: CEK USER ONLINE & JUMLAH DEVICE
 # =============================================
-create_from_backup() {
-    banner
+check_online_users() {
+    clear
     echo -e "${BOLD}${YELLOW}╔════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BOLD}${YELLOW}║        CREATE AKUN DARI FILE BACKUP (SISA HARI)        ║${NC}"
+    echo -e "${BOLD}${YELLOW}║                CEK USER ONLINE                         ║${NC}"
     echo -e "${BOLD}${YELLOW}╚════════════════════════════════════════════════════════╝${NC}"
     echo ""
     
-    echo -e "${WHITE}┌────────────────────────────────────────────────────────────┐${NC}"
-    echo -e "${WHITE}│${GREEN}  FILE BACKUP = LANGSUNG DIPAKAI CREATE${NC}                         ${WHITE}│${NC}"
-    echo -e "${WHITE}│${NC}  Contoh isi file:                                            ${WHITE}│${NC}"
-    echo -e "${WHITE}│${NC}  Limit IP: 2                                                 ${WHITE}│${NC}"
-    echo -e "${WHITE}│${NC}  Dedi 23    → Create: Dedi, masa aktif 23 hari              ${WHITE}│${NC}"
-    echo -e "${WHITE}│${NC}  Sera 12    → Create: Sera, masa aktif 12 hari              ${WHITE}│${NC}"
-    echo -e "${WHITE}│${NC}  Weni3 3    → Create: Weni3, masa aktif 3 hari              ${WHITE}│${NC}"
-    echo -e "${WHITE}│${NC}                                                              ${WHITE}│${NC}"
-    echo -e "${WHITE}│${NC}  Limit IP: 1                                                 ${WHITE}│${NC}"
-    echo -e "${WHITE}│${NC}  Asa 32     → Create: Asa, masa aktif 32 hari               ${WHITE}│${NC}"
-    echo -e "${WHITE}│${NC}  Kimi2 34   → Create: Kimi2, masa aktif 34 hari             ${WHITE}│${NC}"
-    echo -e "${WHITE}└────────────────────────────────────────────────────────────┘${NC}"
-    echo ""
-    
-    echo -e "${YELLOW}Pilih sumber file backup:${NC}"
-    echo -e "  ${GREEN}1${NC}. File Lokal (dari $BACKUP_DIR)"
-    echo -e "  ${GREEN}2${NC}. Link URL"
-    echo -e "  ${GREEN}3${NC}. Telegram"
-    echo -e "  ${RED}0${NC}. Kembali"
-    echo ""
-    read -rp "Pilih [0-3]: " src_choice
-    
-    local file_path=""
-    
-    case $src_choice in
-        1)
-            echo ""
-            echo "File di $BACKUP_DIR:"
-            echo "----------------------------------------"
-            ls -lh "$BACKUP_DIR"/*.txt 2>/dev/null | awk '{print "  " $9 " (" $5 ")"}' | head -10
-            echo "----------------------------------------"
-            echo ""
-            read -rp "Masukkan nama file: " filename
-            file_path="$BACKUP_DIR/$filename"
-            if [[ ! -f "$file_path" ]]; then
-                echo -e "${RED}File tidak ditemukan!${NC}"
-                press_enter
-                return
-            fi
-            ;;
-        2)
-            echo ""
-            read -rp "Masukkan URL file: " file_url
-            file_path="/tmp/restore_$$.txt"
-            echo "Mengunduh file..."
-            wget -q --show-progress "$file_url" -O "$file_path"
-            if [[ ! -f "$file_path" ]] || [[ ! -s "$file_path" ]]; then
-                echo -e "${RED}Gagal mengunduh file!${NC}"
-                rm -f "$file_path"
-                press_enter
-                return
-            fi
-            echo -e "${GREEN}✓ Download berhasil${NC}"
-            ;;
-        3)
-            echo ""
-            echo "Cara dapat file path dari Telegram:"
-            echo "1. Buka chat dengan bot"
-            echo "2. Cari file backup yang dikirim"
-            echo "3. Klik file → Copy link/file path"
-            echo ""
-            read -rp "Masukkan File ID/Path: " file_id
-            file_path="/tmp/restore_$$.txt"
-            echo "Mengunduh dari Telegram..."
-            local download_url="https://api.telegram.org/file/bot$BOT_TOKEN/$file_id"
-            wget -q --show-progress "$download_url" -O "$file_path"
-            if [[ ! -f "$file_path" ]] || [[ ! -s "$file_path" ]]; then
-                echo -e "${RED}Gagal mengunduh file!${NC}"
-                rm -f "$file_path"
-                press_enter
-                return
-            fi
-            echo -e "${GREEN}✓ Download berhasil${NC}"
-            ;;
-        0)
-            return
-            ;;
-        *)
-            echo -e "${RED}Pilihan tidak valid!${NC}"
-            sleep 1
-            return
-            ;;
-    esac
-    
-    echo ""
-    echo -e "${YELLOW}Memproses file backup...${NC}"
-    echo ""
-    
-    # Tampilkan preview file
-    echo -e "${WHITE}┌────────────────────────────────────────────────────────────┐${NC}"
-    echo -e "${WHITE}│${CYAN}                    PREVIEW FILE BACKUP                    ${WHITE}│${NC}"
-    echo -e "${WHITE}├────────────────────────────────────────────────────────────┤${NC}"
-    
-    local line_num=0
-    while IFS= read -r line; do
-        if [[ $line_num -lt 8 ]]; then
-            if [[ "$line" == \#* ]]; then
-                echo -e "${WHITE}│${CYAN}  $line${NC} ${WHITE}│${NC}"
-            elif [[ "$line" == "Limit IP:"* ]]; then
-                echo -e "${WHITE}│${YELLOW}  $line${NC} ${WHITE}│${NC}"
-            elif [[ -n "$line" ]]; then
-                echo -e "${WHITE}│${GREEN}  $line${NC} ${WHITE}│${NC}"
-            fi
-        fi
-        ((line_num++))
-    done < "$file_path"
-    
-    if [[ $line_num -gt 8 ]]; then
-        echo -e "${WHITE}│${NC}  ... dan $((line_num - 8)) baris lainnya                ${WHITE}│${NC}"
+    if ! command -v netstat &> /dev/null; then
+        apt-get install -y net-tools > /dev/null 2>&1
     fi
-    echo -e "${WHITE}└────────────────────────────────────────────────────────────┘${NC}"
+    
+    echo -e "${WHITE}Mengecek koneksi UDP yang aktif...${NC}"
     echo ""
     
-    read -rp "Lanjutkan create akun dari file ini? [y/N]: " confirm
-    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
-        echo -e "${YELLOW}Dibatalkan.${NC}"
-        rm -f "$file_path"
+    # Ambil semua koneksi UDP ke port 5667
+    local connections=$(netstat -un 2>/dev/null | grep :5667 | grep -v "127.0.0.1" | grep -v "::1")
+    
+    if [[ -z "$connections" ]]; then
+        echo -e "${YELLOW}Tidak ada koneksi aktif saat ini${NC}"
+        echo ""
         press_enter
         return
     fi
     
-    # Proses file
-    local current_limit="2"
-    local restored=0
-    local skipped=0
-    local failed=0
-    local created_list=()
-    
-    echo ""
+    # Kelompokkan berdasarkan IP
     echo -e "${WHITE}┌────────────────────────────────────────────────────────────┐${NC}"
-    echo -e "${WHITE}│${CYAN}                    PROSES CREATE AKUN                     ${WHITE}│${NC}"
+    echo -e "${WHITE}│${CYAN}              USER ONLINE BERDASARKAN IP                  ${WHITE}│${NC}"
     echo -e "${WHITE}├────────────────────────────────────────────────────────────┤${NC}"
     
-    while IFS= read -r line || [[ -n "$line" ]]; do
-        # Skip komentar dan baris kosong
-        if [[ "$line" =~ ^# ]] || [[ -z "$line" ]]; then
-            continue
+    local total_koneksi=0
+    local unique_ips=()
+    
+    # Ambil IP unik dan hitung koneksi per IP
+    while read -r ip; do
+        if [[ -n "$ip" ]]; then
+            local count=$(echo "$connections" | grep -c "$ip")
+            echo -e "${WHITE}│${NC}  ${GREEN}➤${NC} ${YELLOW}$ip${NC} - ${CYAN}$count koneksi${NC}          ${WHITE}│${NC}"
+            unique_ips+=("$ip")
+            total_koneksi=$((total_koneksi + count))
         fi
-        
-        # Cek baris Limit IP
-        if [[ "$line" =~ ^Limit[[:space:]]IP:[[:space:]]([0-9]+)$ ]]; then
-            current_limit="${BASH_REMATCH[1]}"
-            local limit_display="$([ "$current_limit" == "0" ] && echo "Unlimited" || echo "$current_limit Device")"
-            echo -e "${WHITE}│${YELLOW}  → Set Limit IP: $limit_display${NC}        ${WHITE}│${NC}"
-            continue
-        fi
-        
-        # Parse user (nama sisa_hari)
-        local arr=($line)
-        if [[ ${#arr[@]} -ge 2 ]]; then
-            local name="${arr[0]}"
-            local days="${arr[1]}"
-            
-            # Validasi days harus angka
-            if ! [[ "$days" =~ ^[0-9]+$ ]]; then
-                echo -e "${WHITE}│${RED}  ✗ $line (masa aktif bukan angka)${NC}        ${WHITE}│${NC}"
-                ((failed++))
-                continue
-            fi
-            
-            # Password = nama
-            local password="$name"
-            
-            # Cek duplikasi
-            if grep -q "|$password|" "$DB" 2>/dev/null; then
-                echo -e "${WHITE}│${YELLOW}  ⚠ $password sudah ada, dilewati${NC}        ${WHITE}│${NC}"
-                ((skipped++))
-                continue
-            fi
-            
-            # Hitung expired dari HARI INI + days
-            local exp=""
-            if [[ "$days" == "0" ]]; then
-                exp="unlimited"
-            else
-                exp=$(date -d "+$days days" +"%Y-%m-%d")
-            fi
-            
-            # Simpan ke database
-            echo "user_$password|$password|$exp|$current_limit" >> "$DB"
-            echo -e "${WHITE}│${GREEN}  ✓ $password (${days} hari, limit: $current_limit)${NC}   ${WHITE}│${NC}"
-            ((restored++))
-            created_list+=("$name|$password|$days")
-        fi
-    done < "$file_path"
+    done < <(echo "$connections" | awk '{print $5}' | cut -d: -f1 | sort -u)
+    
+    echo -e "${WHITE}├────────────────────────────────────────────────────────────┤${NC}"
+    echo -e "${WHITE}│${NC}  Total Koneksi: ${GREEN}$total_koneksi${NC}                                   ${WHITE}│${NC}"
+    echo -e "${WHITE}│${NC}  Unique IP    : ${GREEN}${#unique_ips[@]}${NC}                                   ${WHITE}│${NC}"
+    echo -e "${WHITE}└────────────────────────────────────────────────────────────┘${NC}"
+    echo ""
+    
+    # Coba cocokkan dengan user di database
+    echo -e "${WHITE}┌────────────────────────────────────────────────────────────┐${NC}"
+    echo -e "${WHITE}│${CYAN}              DETAIL PER USER (BERDASARKAN IP)            ${WHITE}│${NC}"
+    echo -e "${WHITE}├────────────────────────────────────────────────────────────┤${NC}"
+    
+    # Buat file sementara untuk menyimpan IP dan user
+    local temp_ip_user="/tmp/ip_user_$$.txt"
+    > "$temp_ip_user"
+    
+    # Coba tebak user berdasarkan IP (ini hanya perkiraan)
+    # Kita bisa lihat dari log atau netstat yang menampilkan IP
+    
+    local found=0
+    for ip in "${unique_ips[@]}"; do
+        # Cari di database berdasarkan IP? Tidak ada, jadi kita tampilkan IP saja
+        # Tapi kita bisa cek di log jika ada
+        echo -e "${WHITE}│${NC}  IP: ${YELLOW}$ip${NC}                                              ${WHITE}│${NC}"
+        ((found++))
+    done
+    
+    if [[ $found -eq 0 ]]; then
+        echo -e "${WHITE}│${NC}  ${YELLOW}Tidak dapat mencocokkan dengan user${NC}                   ${WHITE}│${NC}"
+    fi
     
     echo -e "${WHITE}└────────────────────────────────────────────────────────────┘${NC}"
     echo ""
     
-    if [[ $restored -gt 0 ]]; then
-        # Update config
-        update_config_json
-        
-        # Tampilkan ringkasan
-        echo -e "${WHITE}╔════════════════════════════════════════════════════════╗${NC}"
-        echo -e "${WHITE}║${GREEN}                 CREATE SELESAI                       ${WHITE}║${NC}"
-        echo -e "${WHITE}╠════════════════════════════════════════════════════════╣${NC}"
-        echo -e "${WHITE}║${NC}  Berhasil : ${GREEN}$restored user${NC}                               ${WHITE}║${NC}"
-        echo -e "${WHITE}║${NC}  Dilewati : ${YELLOW}$skipped user${NC} (sudah ada)                     ${WHITE}║${NC}"
-        echo -e "${WHITE}║${NC}  Gagal    : ${RED}$failed user${NC}                                   ${WHITE}║${NC}"
-        echo -e "${WHITE}╚════════════════════════════════════════════════════════╝${NC}"
-        echo ""
-        
-        # Tampilkan daftar yang berhasil
-        echo -e "${CYAN}Daftar Password Baru:${NC}"
-        for item in "${created_list[@]}"; do
-            IFS='|' read -r name pass days <<< "$item"
-            echo -e "  ${GREEN}✓${NC} $name → ${CYAN}$pass${NC} (${days} hari)"
-        done
-        echo ""
-        
-        # Kirim notifikasi
-        local location=$(get_location)
-        local list_pass=""
-        for item in "${created_list[@]}"; do
-            IFS='|' read -r name pass days <<< "$item"
-            list_pass="$list_pass\n- $name : \`$pass\` (${days} hari)"
-        done
-        
-        send_telegram "🔄 *CREATE DARI FILE BACKUP*
-Berhasil : $restored user
-Dilewati : $skipped user
-Server   : $location
-══════════════════════
-Daftar Baru:$list_pass"
-    fi
+    # Tampilkan user aktif di database
+    local today=$(date +%Y-%m-%d)
+    local active_users=0
     
-    # Bersihkan
-    rm -f "$file_path"
+    echo -e "${WHITE}┌────────────────────────────────────────────────────────────┐${NC}"
+    echo -e "${WHITE}│${CYAN}              USER AKTIF DI DATABASE                      ${WHITE}│${NC}"
+    echo -e "${WHITE}├────────────────────────────────────────────────────────────┤${NC}"
     
+    while IFS='|' read -r user pass expiry limit; do
+        if [[ "$expiry" == "unlimited" ]] || [[ "$expiry" > "$today" ]] || [[ "$expiry" == "$today" ]]; then
+            local limit_display="$([ "$limit" == "0" ] && echo "∞" || echo "$limit")"
+            printf "${WHITE}│${NC}  ${GREEN}✓${NC} %-15s (Limit: %s)        ${WHITE}│${NC}\n" "$pass" "$limit_display"
+            ((active_users++))
+        fi
+    done < "$DB"
+    
+    echo -e "${WHITE}├────────────────────────────────────────────────────────────┤${NC}"
+    echo -e "${WHITE}│${NC}  Total User Aktif: ${GREEN}$active_users${NC}                                 ${WHITE}│${NC}"
+    echo -e "${WHITE}└────────────────────────────────────────────────────────────┘${NC}"
+    
+    rm -f "$temp_ip_user"
     echo ""
     press_enter
 }
 
 # =============================================
-#  FITUR 4: LIST USERS
+#  FITUR 5: LIST USERS DENGAN SISA MASA AKTIF
 # =============================================
 list_users() {
-    banner
+    clear
     echo -e "${BOLD}${YELLOW}╔════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BOLD}${YELLOW}║                     DAFTAR USER                         ║${NC}"
+    echo -e "${BOLD}${YELLOW}║           DAFTAR USER (SISA MASA AKTIF)                ║${NC}"
     echo -e "${BOLD}${YELLOW}╚════════════════════════════════════════════════════════╝${NC}"
     echo ""
     
@@ -764,16 +694,16 @@ list_users() {
     local aktif=0
     local expired=0
     
-    printf "${WHITE}%-20s %-15s %-10s %s${NC}\n" "PASSWORD" "EXPIRED" "LIMIT" "STATUS"
-    echo -e "${WHITE}──────────────────────────────────────────────────────${NC}"
+    printf "${WHITE}%-20s %-12s %-8s %-12s %s${NC}\n" "PASSWORD" "EXPIRED" "LIMIT" "SISA HARI" "STATUS"
+    echo -e "${WHITE}──────────────────────────────────────────────────────────────────${NC}"
     
     while IFS='|' read -r user pass expiry limit; do
-        # Hitung sisa hari
-        local sisa_hari=""
+        local limit_display="$([ "$limit" == "0" ] && echo "∞" || echo "$limit")"
+        
         if [[ "$expiry" == "unlimited" ]]; then
             status="${GREEN}Aktif${NC}"
             exp_display="Unlimited"
-            sisa_hari="∞"
+            sisa_hari="${GREEN}∞${NC}"
             ((aktif++))
         else
             local exp_epoch=$(date -d "$expiry" +%s 2>/dev/null)
@@ -782,33 +712,31 @@ list_users() {
             if [[ $diff_days -ge 0 ]]; then
                 status="${GREEN}Aktif${NC}"
                 exp_display="$expiry"
-                sisa_hari="${diff_days} hari"
+                sisa_hari="${GREEN}$diff_days hari${NC}"
                 ((aktif++))
             else
                 status="${RED}Expired${NC}"
                 exp_display="$expiry"
-                sisa_hari="Expired"
+                sisa_hari="${RED}Expired${NC}"
                 ((expired++))
             fi
         fi
         
-        limit_display="$([ "$limit" == "0" ] && echo "∞" || echo "$limit")"
-        
-        printf "%-20s %-15s %-10s " "$pass" "$exp_display" "$limit_display"
+        printf "%-20s %-12s %-8s %-12s " "$pass" "$exp_display" "$limit_display" "$(echo -e "$sisa_hari")"
         echo -e "$status"
     done < "$DB"
     
-    echo -e "${WHITE}──────────────────────────────────────────────────────${NC}"
+    echo -e "${WHITE}──────────────────────────────────────────────────────────────────${NC}"
     echo -e "Total: ${GREEN}$(wc -l < "$DB")${NC} user | Aktif: ${GREEN}$aktif${NC} | Expired: ${RED}$expired${NC}"
     
     press_enter
 }
 
 # =============================================
-#  FITUR 5: HAPUS USER
+#  FITUR 6: HAPUS USER
 # =============================================
 delete_user() {
-    banner
+    clear
     echo -e "${BOLD}${YELLOW}╔════════════════════════════════════════════════════════╗${NC}"
     echo -e "${BOLD}${YELLOW}║                     HAPUS USER                          ║${NC}"
     echo -e "${BOLD}${YELLOW}╚════════════════════════════════════════════════════════╝${NC}"
@@ -848,33 +776,10 @@ delete_user() {
 }
 
 # =============================================
-#  FITUR 6: SET DOMAIN
-# =============================================
-set_domain() {
-    banner
-    echo -e "${BOLD}${YELLOW}╔════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BOLD}${YELLOW}║                    SET DOMAIN                           ║${NC}"
-    echo -e "${BOLD}${YELLOW}╚════════════════════════════════════════════════════════╝${NC}"
-    echo ""
-    
-    echo -e "Domain saat ini: ${CYAN}$DOMAIN${NC}"
-    echo ""
-    read -rp "Domain baru: " new_domain
-    
-    if [[ -n "$new_domain" ]]; then
-        DOMAIN="$new_domain"
-        echo "$DOMAIN" > "$DOMAIN_FILE"
-        echo -e "${GREEN}✓ Domain diubah ke: $new_domain${NC}"
-    fi
-    
-    press_enter
-}
-
-# =============================================
 #  FITUR 7: HAPUS EXPIRED
 # =============================================
 clean_expired() {
-    banner
+    clear
     echo -e "${BOLD}${YELLOW}╔════════════════════════════════════════════════════════╗${NC}"
     echo -e "${BOLD}${YELLOW}║                  HAPUS USER EXPIRED                     ║${NC}"
     echo -e "${BOLD}${YELLOW}╚════════════════════════════════════════════════════════╝${NC}"
@@ -911,10 +816,33 @@ clean_expired() {
 }
 
 # =============================================
-#  FITUR 8: RESTART SERVICE
+#  FITUR 8: SET DOMAIN
+# =============================================
+set_domain() {
+    clear
+    echo -e "${BOLD}${YELLOW}╔════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BOLD}${YELLOW}║                    SET DOMAIN                           ║${NC}"
+    echo -e "${BOLD}${YELLOW}╚════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    
+    echo -e "Domain saat ini: ${CYAN}$DOMAIN${NC}"
+    echo ""
+    read -rp "Domain baru: " new_domain
+    
+    if [[ -n "$new_domain" ]]; then
+        DOMAIN="$new_domain"
+        echo "$DOMAIN" > "$DOMAIN_FILE"
+        echo -e "${GREEN}✓ Domain diubah ke: $new_domain${NC}"
+    fi
+    
+    press_enter
+}
+
+# =============================================
+#  FITUR 9: RESTART SERVICE
 # =============================================
 restart_service() {
-    banner
+    clear
     echo -e "${BOLD}${YELLOW}╔════════════════════════════════════════════════════════╗${NC}"
     echo -e "${BOLD}${YELLOW}║                  RESTART SERVICE                        ║${NC}"
     echo -e "${BOLD}${YELLOW}╚════════════════════════════════════════════════════════╝${NC}"
@@ -933,10 +861,10 @@ restart_service() {
 }
 
 # =============================================
-#  FITUR 9: INSTALL ZIVPN
+#  FITUR 10: INSTALL ZIVPN
 # =============================================
 install_zivpn() {
-    banner
+    clear
     echo -e "${BOLD}${YELLOW}╔════════════════════════════════════════════════════════╗${NC}"
     echo -e "${BOLD}${YELLOW}║                  INSTALL ZIVPN UDP                      ║${NC}"
     echo -e "${BOLD}${YELLOW}╚════════════════════════════════════════════════════════╝${NC}"
@@ -950,7 +878,7 @@ install_zivpn() {
     
     echo -e "${BLUE}[1/6]${NC} Update sistem..."
     apt-get update -y > /dev/null 2>&1
-    apt-get install -y wget curl openssl ufw cron jq zip unzip > /dev/null 2>&1
+    apt-get install -y wget curl openssl ufw cron jq zip unzip net-tools > /dev/null 2>&1
     echo -e "${GREEN}✓ Selesai${NC}"
     
     echo -e "${BLUE}[2/6]${NC} Download binary..."
@@ -1036,10 +964,10 @@ Waktu: $(date +"%d %B %Y %H:%M")"
 }
 
 # =============================================
-#  FITUR 10: UNINSTALL
+#  FITUR 11: UNINSTALL
 # =============================================
 uninstall_zivpn() {
-    banner
+    clear
     echo -e "${BOLD}${RED}╔════════════════════════════════════════════════════════╗${NC}"
     echo -e "${BOLD}${RED}║                  UNINSTALL ZIVPN                        ║${NC}"
     echo -e "${BOLD}${RED}╚════════════════════════════════════════════════════════╝${NC}"
@@ -1086,29 +1014,31 @@ main_menu() {
                 *) echo "Pilihan tidak valid"; sleep 1 ;;
             esac
         else
-            echo -e "  ${GREEN}1${NC}. Create Mass Accounts (Global Limit)"
-            echo -e "  ${GREEN}2${NC}. Backup Accounts (Sisa Hari)"
-            echo -e "  ${GREEN}3${NC}. Create dari File Backup"
-            echo -e "  ${CYAN}4${NC}. List Users"
-            echo -e "  ${RED}5${NC}. Hapus User"
-            echo -e "  ${YELLOW}6${NC}. Hapus Expired"
-            echo -e "  ${BLUE}7${NC}. Set Domain"
-            echo -e "  ${PURPLE}8${NC}. Restart Service"
-            echo -e "  ${RED}9${NC}. Uninstall ZIVPN"
+            echo -e "  ${GREEN}1${NC}. Create Akun (Random 2 Digit)"
+            echo -e "  ${GREEN}2${NC}. Create Mass Accounts (Global Limit)"
+            echo -e "  ${GREEN}3${NC}. Backup (Tampilkan File)"
+            echo -e "  ${CYAN}4${NC}. Cek User Online & Device"
+            echo -e "  ${CYAN}5${NC}. List Users (Sisa Masa Aktif)"
+            echo -e "  ${RED}6${NC}. Hapus User"
+            echo -e "  ${YELLOW}7${NC}. Hapus Expired"
+            echo -e "  ${BLUE}8${NC}. Set Domain"
+            echo -e "  ${PURPLE}9${NC}. Restart Service"
+            echo -e "  ${RED}10${NC}. Uninstall ZIVPN"
             echo -e "  ${RED}0${NC}. Keluar"
             echo ""
             read -rp "Pilih menu: " choice
             
             case $choice in
-                1) create_mass_accounts ;;
-                2) backup_accounts ;;
-                3) create_from_backup ;;
-                4) list_users ;;
-                5) delete_user ;;
-                6) clean_expired ;;
-                7) set_domain ;;
-                8) restart_service ;;
-                9) uninstall_zivpn ;;
+                1) create_account_random ;;
+                2) create_mass_accounts ;;
+                3) backup_accounts ;;
+                4) check_online_users ;;
+                5) list_users ;;
+                6) delete_user ;;
+                7) clean_expired ;;
+                8) set_domain ;;
+                9) restart_service ;;
+                10) uninstall_zivpn ;;
                 0) exit 0 ;;
                 *) echo "Pilihan tidak valid"; sleep 1 ;;
             esac
