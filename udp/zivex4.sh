@@ -158,58 +158,7 @@ auto_backup() {
     
     send_telegram "$backup_text"
 }
-# === AUTO BACKUP FUNCTION ===
-auto_backup() {
-    source "$TG_FILE" 2>/dev/null
-    
-    local today_epoch=$(date +%s)
-    
-    # Header
-    local backup_text="📁 BACKUP ZIVPN EXPRESS\n"
-    backup_text="${backup_text}══════════════════════\n"
-    backup_text="${backup_text}Waktu  : $(date +"%d %B %Y %H:%M")\n"
-    backup_text="${backup_text}Domain : $DOMAIN\n"
-    backup_text="${backup_text}IP     : $(get_ip)\n"
-    backup_text="${backup_text}══════════════════════\n\n"
-    backup_text="${backup_text}DAFTAR USER SISA MASA AKTIF\n\n"
-    
-    local current_limit=""
-    local total_user=0
-    
-    while IFS='|' read -r user pass expiry limit; do
-        # Skip expired
-        if [[ "$expiry" != "unlimited" ]]; then
-            local exp_epoch=$(date -d "$expiry" +%s 2>/dev/null)
-            if [[ $exp_epoch -lt $today_epoch ]]; then
-                continue
-            fi
-        fi
-        
-        # Tulis Limit IP jika berubah
-        if [[ "$limit" != "$current_limit" ]]; then
-            backup_text="${backup_text}────────────────────\n"
-            backup_text="${backup_text}Limit IP: $limit\n"
-            backup_text="${backup_text}────────────────────\n"
-            current_limit="$limit"
-        fi
-        
-        # Hitung sisa hari
-        if [[ "$expiry" == "unlimited" ]]; then
-            backup_text="${backup_text}$pass 0\n"
-        else
-            local sisa_hari=$(hitung_sisa_hari "$expiry")
-            backup_text="${backup_text}$pass $sisa_hari\n"
-        fi
-        ((total_user++))
-        
-    done < "$DB"
-    
-    # Footer
-    backup_text="${backup_text}\n══════════════════════\n"
-    backup_text="${backup_text}Total User: $total_user"
-    
-    send_telegram "$backup_text"
-}
+
 
 # === BACKUP LANGSUNG ===
 backup_langsung() {
